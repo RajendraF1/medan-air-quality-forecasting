@@ -1,5 +1,5 @@
 """
-AirSense — Aplikasi Utama (Production)
+ARISQA — Aplikasi Utama (Production)
 =========================================
 Main FastAPI application.
 - Mount static files & templates
@@ -28,7 +28,7 @@ from aplikasi_lab.dashboard_api import eval_router, auth_router
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup
-    print("[APP] Starting up AirSense Production...")
+    print("[APP] Starting up ARISQA Production...")
     
     # Init Database
     init_db()
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     print("[APP] Shutting down...")
 
 app = FastAPI(
-    title="AirSense API",
+    title="ARISQA API",
     description="Prediksi Kualitas Udara Real-time",
     version="1.0.0",
     lifespan=lifespan,

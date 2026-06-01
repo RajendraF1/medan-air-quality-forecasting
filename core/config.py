@@ -1,5 +1,5 @@
 """
-AirSense — Konfigurasi Terpusat
+ARISQA — Konfigurasi Terpusat
 =================================
 Semua konfigurasi aplikasi production di satu tempat.
 

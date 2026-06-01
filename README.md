@@ -1,8 +1,8 @@
-# AirSense - Prediksi Kualitas Udara Real-time
+# ARISQA - Prediksi Kualitas Udara Real-time
 
-![AirSense](https://img.shields.io/badge/AirSense-Production-050505?style=for-the-badge&logo=wind&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=FastAPI&logoColor=white) ![XGBoost](https://img.shields.io/badge/XGBoost-191A1B?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![ARISQA](https://img.shields.io/badge/ARISQA-Production-050505?style=for-the-badge&logo=wind&logoColor=white) ![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=FastAPI&logoColor=white) ![XGBoost](https://img.shields.io/badge/XGBoost-191A1B?style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 
-AirSense adalah sistem pemantauan dan prediksi kualitas udara (PM2.5) berbasis **FastAPI** dan **XGBoost**. Nilai PM2.5 yang diproses dan diprediksi oleh sistem akan dikonversi menjadi Air Quality Index (AQI) menggunakan standar US EPA 2024. Aplikasi ini berfokus pada area Stasiun USU Medan.
+ARISQA adalah sistem pemantauan dan prediksi kualitas udara (PM2.5) berbasis **FastAPI** dan **XGBoost**. Nilai PM2.5 yang diproses dan diprediksi oleh sistem akan dikonversi menjadi Air Quality Index (AQI) menggunakan standar US EPA 2024. Aplikasi ini berfokus pada area Stasiun USU Medan.
 
 Data utama disimpan sebagai CSV secara lokal (`core/data/kualitas_udara/`). Pengambilan data dari OpenAQ bersifat **manual/on-demand**. Sistem akan memeriksa *timestamp* data lokal terakhir dan hanya mengambil data terbaru dari OpenAQ. Jika OpenAQ belum menyediakan data baru, aplikasi tetap beroperasi secara normal menggunakan dataset lokal terakhir.
 
