@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirSense — Prediksi Kualitas Udara Real-time</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#eff6ff', 100: '#dbeafe', 400: '#60a5fa', 500: '#3b82f6', 600: '#2563eb', 900: '#1e3a8a' },
+                        aqi: { good: '#00e400', moderate: '#ffff00', usg: '#ff7e00', unhealthy: '#ff0000', veryUnhealthy: '#8f3f97', hazardous: '#7e0023' }
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'float': 'float 6s ease-in-out infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out forwards',
+                        'slide-up': 'slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards',
+                    },
+                    keyframes: {
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' },
+                        },
+                        fadeIn: {
+                            '0%': { opacity: '0' },
+                            '100%': { opacity: '1' },
+                        },
+                        slideUp: {
+                            '0%': { opacity: '0', transform: 'translateY(20px)' },
+                            '100%': { opacity: '1', transform: 'translateY(0)' },
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    
+    <!-- Leaflet.js -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        body {
+            background-color: #050505; /* Deep classic black */
+            background-image: 
+                radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.03) 0%, transparent 70%);
+            background-attachment: fixed;
+            color: #e5e5e5;
+            font-family: 'Inter', sans-serif;
+            letter-spacing: 0.01em;
+        }
+        
+        /* Glassmorphism utilities - Monochrome */
+        .glass {
+            background: rgba(15, 15, 15, 0.6);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+        }
+        .glass-panel {
+            background: linear-gradient(145deg, rgba(20, 20, 20, 0.8) 0%, rgba(5, 5, 5, 0.9) 100%);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.02);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.04);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .glass-card:hover {
+            background: rgba(255, 255, 255, 0.04);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        /* Gauge */
+        .gauge-ring {
+            transition: stroke-dashoffset 1.5s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
+        }
+
+        /* Hide sections initially */
+        .page-section {
+            display: none;
+            opacity: 0;
+            transition: opacity 0.4s ease;
+        }
+        .page-section.active {
+            display: block;
+            opacity: 1;
+        }
+
+        /* Nav Tab styling - Classic Underline */
+        .nav-item {
+            position: relative;
+            transition: color 0.3s ease;
+            color: #888;
+        }
+        .nav-item:hover {
+            color: #fff;
+        }
+        .nav-item::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            width: 100%;
+            height: 1px;
+            background: #fff;
+            transform: scaleX(0);
+            transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            transform-origin: center;
+        }
+        .nav-item.active {
+            color: #fff;
+        }
+        .nav-item.active::after {
+            transform: scaleX(1);
+        }
+
+        /* Leaflet Map Dark Theme Overrides */
+        .leaflet-container {
+            background: #050505;
+            border-radius: 1rem;
+        }
+        .leaflet-layer,
+        .leaflet-control-zoom-in,
+        .leaflet-control-zoom-out,
+        .leaflet-control-attribution {
+            filter: grayscale(100%) invert(100%) brightness(80%) contrast(120%);
+        }
+
+        /* Custom Scrollbar - Minimal */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="min-h-screen text-neutral-300 antialiased overflow-x-hidden selection:bg-white/20 selection:text-white">
+
+    <!-- Decorative Subtle Glow -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none z-[-1]">
+        <div class="absolute top-0 left-1/2 -translate-x-1/2 w-[80%] h-[50%] rounded-full bg-white/[0.02] blur-[150px]"></div>
+    </div>
+
+    <!-- Header & Navigation -->
+    <header class="sticky top-0 z-50 glass border-b border-white/5">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Logo -->
+                <div class="flex-shrink-0 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-neutral-700 to-neutral-900 flex items-center justify-center shadow-lg shadow-white/5">
+                        <i data-lucide="wind" class="text-white w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400 tracking-tight">
+                            AirSense
+                        </h1>
+                        <p class="text-[10px] text-neutral-400 font-medium uppercase tracking-widest -mt-1">Production</p>
+                    </div>
+                </div>
+
+                <!-- Desktop Nav -->
+                <nav class="hidden md:flex space-x-8">
+                    <button onclick="switchTab('dashboard')" id="tab-dashboard" class="nav-item active text-sm font-medium text-neutral-300 hover:text-white py-2 flex items-center gap-2">
+                        <i data-lucide="layout-dashboard" class="w-4 h-4"></i> Dashboard
+                    </button>
+                    <button onclick="switchTab('map')" id="tab-map" class="nav-item text-sm font-medium text-neutral-300 hover:text-white py-2 flex items-center gap-2">
+                        <i data-lucide="map" class="w-4 h-4"></i> Area Paparan
+                    </button>
+                    <button onclick="switchTab('prediction')" id="tab-prediction" class="nav-item text-sm font-medium text-neutral-300 hover:text-white py-2 flex items-center gap-2">
+                        <i data-lucide="trending-up" class="w-4 h-4"></i> Prediksi AI
+                    </button>
+                    <button onclick="switchTab('health')" id="tab-health" class="nav-item text-sm font-medium text-neutral-300 hover:text-white py-2 flex items-center gap-2">
+                        <i data-lucide="shield-alert" class="w-4 h-4"></i> Mitigasi Kesehatan
+                    </button>
+                    <button onclick="switchTab('model')" id="tab-model" class="nav-item text-sm font-medium text-neutral-300 hover:text-white py-2 flex items-center gap-2">
+                        <i data-lucide="cpu" class="w-4 h-4"></i> Info Model
+                    </button>
+                </nav>
+
+                <!-- Status Badge -->
+                <div class="hidden sm:flex items-center gap-3 glass-card px-4 py-1.5 rounded-full">
+                    <div class="relative flex h-2 w-2">
+                        <span id="syncPulse" class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span id="syncDot" class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </div>
+                    <span id="syncStatusText" class="text-xs font-medium text-neutral-300">Active</span>
+                </div>
+                
+                <!-- Admin Login Button -->
+                <button onclick="document.getElementById('loginModal').style.display='flex'" class="hidden sm:flex items-center gap-2 glass-card hover:bg-white/10 px-4 py-1.5 rounded-full transition-colors text-sm font-medium text-neutral-300">
+                    <i data-lucide="lock" class="w-4 h-4 text-neutral-400"></i> Admin
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 min-h-[calc(100vh-4rem)] relative">
+        
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="absolute inset-0 z-40 bg-black/50 backdrop-blur-sm flex items-center justify-center rounded-2xl transition-opacity duration-300">
+            <div class="flex flex-col items-center gap-4">
+                <i data-lucide="loader-2" class="w-10 h-10 text-neutral-400 animate-spin"></i>
+                <p class="text-sm font-medium text-neutral-300">Memuat data kualitas udara...</p>
+            </div>
+        </div>
+
+        <!-- ========================================================= -->
+        <!-- 1. DASHBOARD TAB -->
+        <!-- ========================================================= -->
+        <section id="page-dashboard" class="page-section active animate-slide-up">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                
+                <!-- Main AQI Card -->
+                <div class="lg:col-span-1 glass-panel rounded-3xl p-8 flex flex-col items-center justify-center relative overflow-hidden group">
+                    <div class="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                    
+                    <h2 class="text-sm font-bold tracking-widest text-neutral-400 uppercase mb-8">Kualitas Udara (AQI)</h2>
+                    
+                    <div class="relative w-64 h-64 animate-float">
+                        <svg viewBox="0 0 200 200" class="w-full h-full -rotate-90">
+                            <!-- Background Ring -->
+                            <circle cx="100" cy="100" r="85" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="12" stroke-linecap="round"/>
+                            <!-- Value Ring -->
+                            <circle id="mainAqiRing" cx="100" cy="100" r="85" fill="none" stroke="#3b82f6" stroke-width="12" stroke-linecap="round"
+                                stroke-dasharray="534" stroke-dashoffset="534" class="gauge-ring"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="mainAqiValue" class="text-7xl font-black tabular-nums tracking-tighter text-white drop-shadow-lg">--</span>
+                            <span class="text-sm font-medium text-neutral-400 mt-1">US EPA</span>
+                        </div>
+                    </div>
+
+                    <div id="mainAqiBadge" class="mt-8 px-6 py-2 rounded-full text-sm font-bold tracking-wide shadow-lg border border-white/10" style="background: rgba(59,130,246,0.2); color: #60a5fa;">
+                        Memuat...
+                    </div>
+                </div>
+
+                <!-- Metrics Grid -->
+                <div class="lg:col-span-2 grid grid-cols-2 gap-4">
+                    <!-- PM2.5 -->
+                    <div class="col-span-2 sm:col-span-1 glass-panel rounded-3xl p-6 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-6 opacity-10">
+                            <i data-lucide="wind" class="w-16 h-16"></i>
+                        </div>
+                        <p class="text-sm font-medium text-neutral-400 mb-2">Konsentrasi PM2.5</p>
+                        <div class="flex items-baseline gap-2">
+                            <span id="dashPm25" class="text-5xl font-black text-white tabular-nums">--</span>
+                            <span class="text-sm text-neutral-500 font-medium">µg/m³</span>
+                        </div>
+                        <div class="mt-6 flex items-center gap-2 text-xs text-neutral-400">
+                            <i data-lucide="clock" class="w-4 h-4"></i>
+                            <span id="dashTime">Diperbarui: -</span>
+                        </div>
+                    </div>
+
+                    <!-- Prediction Info -->
+                    <div class="col-span-2 sm:col-span-1 glass-panel rounded-3xl p-6 relative overflow-hidden bg-gradient-to-br from-neutral-900/20 to-black/20">
+                        <p class="text-sm font-medium text-neutral-400 mb-2">Prediksi 1 Jam Kedepan</p>
+                        <div class="flex items-baseline gap-2">
+                            <span id="dashPredAqi" class="text-5xl font-black text-neutral-300 tabular-nums">--</span>
+                            <span class="text-sm text-neutral-500 font-medium">AQI</span>
+                        </div>
+                        <div class="mt-6 flex items-center justify-between">
+                            <div class="flex items-center gap-2 text-xs text-neutral-400">
+                                <i data-lucide="cpu" class="w-4 h-4"></i>
+                                <span>Model: XGBoost</span>
+                            </div>
+                            <button onclick="switchTab('prediction')" class="text-xs font-semibold text-neutral-300 hover:text-neutral-100 flex items-center gap-1 transition-colors">
+                                Detail <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Sensors (Small Cards) -->
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center text-orange-400">
+                                <i data-lucide="thermometer" class="w-4 h-4"></i>
+                            </div>
+                            <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Suhu</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="dashTemp" class="text-2xl font-bold text-white">--</span>
+                            <span class="text-sm text-neutral-500">°C</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center text-cyan-400">
+                                <i data-lucide="droplets" class="w-4 h-4"></i>
+                            </div>
+                            <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Kelembaban</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="dashHum" class="text-2xl font-bold text-white">--</span>
+                            <span class="text-sm text-neutral-500">%</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-neutral-400">
+                                <i data-lucide="cloud-fog" class="w-4 h-4"></i>
+                            </div>
+                            <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">PM1.0</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="dashPm1" class="text-2xl font-bold text-white">--</span>
+                            <span class="text-sm text-neutral-500">µg/m³</span>
+                        </div>
+                    </div>
+                    
+                    <div class="glass-card rounded-2xl p-5 flex flex-col justify-center">
+                        <div class="flex items-center gap-3 mb-3">
+                            <div class="w-8 h-8 rounded-full bg-pink-500/20 flex items-center justify-center text-pink-400">
+                                <i data-lucide="activity" class="w-4 h-4"></i>
+                            </div>
+                            <span class="text-xs font-medium text-neutral-400 uppercase tracking-wider">Partikel (UM003)</span>
+                        </div>
+                        <div class="flex items-baseline gap-1">
+                            <span id="dashUm003" class="text-2xl font-bold text-white">--</span>
+                            <span class="text-sm text-neutral-500">p/cm³</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- System Info Footer -->
+            <div class="mt-8 glass-card rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-neutral-400">
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="map-pin" class="w-4 h-4 text-neutral-500"></i>
+                        <span id="sysLocation">Stasiun Pemantau Kualitas Udara USU, Medan</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <span id="sysLastFetch">Sync Terakhir: -</span>
+
+                    <span class="w-1 h-1 rounded-full bg-neutral-600"></span>
+                    <span id="sysLastTrain">Training Terakhir: -</span>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================================= -->
+        <!-- 2. MAP TAB -->
+        <!-- ========================================================= -->
+        <section id="page-map" class="page-section animate-slide-up hidden">
+            <div class="glass-panel rounded-3xl p-6 h-[700px] flex flex-col">
+                <div class="flex justify-between items-end mb-6">
+                    <div>
+                        <h2 class="text-xl font-bold text-white">Area Paparan Polusi</h2>
+                        <p class="text-sm text-neutral-400 mt-1">Estimasi jangkauan paparan kualitas udara berdasarkan stasiun USU.</p>
+                    </div>
+                    <div id="mapLegend" class="hidden sm:flex gap-3 text-[10px] font-medium uppercase tracking-wider">
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-aqi-good"></span> Baik</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-aqi-moderate"></span> Sedang</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-aqi-usg"></span> Tidak Sehat (Sensitif)</div>
+                        <div class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-aqi-unhealthy"></span> Tidak Sehat</div>
+                    </div>
+                </div>
+                
+                <!-- Leaflet Container -->
+                <div class="flex-grow rounded-2xl overflow-hidden border border-white/10 relative">
+                    <div id="leafletMap" class="absolute inset-0 z-10"></div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================================= -->
+        <!-- 3. PREDICTION TAB -->
+        <!-- ========================================================= -->
+        <section id="page-prediction" class="page-section animate-slide-up hidden">
+            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+                
+                <!-- Chart Section -->
+                <div class="lg:col-span-3 glass-panel rounded-3xl p-6 flex flex-col">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Prediksi 24 Jam (XGBoost)</h2>
+                            <p class="text-sm text-neutral-400 mt-1">Tren proyeksi AQI menggunakan Recursive Forecasting.</p>
+                        </div>
+                    </div>
+                    <div class="flex-grow relative min-h-[400px]">
+                        <canvas id="predictionChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Side Info -->
+                <div class="lg:col-span-1 space-y-6">
+                    <!-- Average Prediction -->
+                    <div class="glass-panel rounded-3xl p-6 flex flex-col items-center justify-center text-center">
+                        <p class="text-xs font-bold tracking-widest text-neutral-400 uppercase mb-4">Rata-rata 24 Jam</p>
+                        <div id="predAvgAqiBadge" class="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-black mb-3 shadow-lg" style="background: rgba(255,255,255,0.1);">
+                            --
+                        </div>
+                        <p id="predAvgCategory" class="text-sm font-semibold text-white mb-1">--</p>
+                        <p class="text-xs text-neutral-400">AQI Kategori</p>
+                        
+                        <div class="w-full h-px bg-white/10 my-4"></div>
+                        
+                        <div class="w-full flex justify-between items-center px-2">
+                            <div class="text-left">
+                                <p class="text-[10px] text-neutral-500 uppercase">Min</p>
+                                <p id="predMin" class="text-sm font-bold text-white">-- <span class="text-[10px] font-normal">µg/m³</span></p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-[10px] text-neutral-500 uppercase">Max</p>
+                                <p id="predMax" class="text-sm font-bold text-white">-- <span class="text-[10px] font-normal">µg/m³</span></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Table List -->
+                    <div class="glass-panel rounded-3xl p-5 overflow-hidden flex flex-col h-[300px]">
+                        <h3 class="text-xs font-bold tracking-widest text-neutral-400 uppercase mb-4">Detail Prediksi</h3>
+                        <div class="overflow-y-auto pr-2 flex-grow space-y-2" id="predictionList">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================================= -->
+        <!-- 4. MODEL INFO TAB (Lite) -->
+        <!-- ========================================================= -->
+        <section id="page-model" class="page-section animate-slide-up hidden">
+            <div class="max-w-4xl mx-auto">
+                <div class="glass-panel rounded-3xl p-8">
+                    <div class="flex items-center gap-4 mb-8">
+                        <div class="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center text-neutral-300">
+                            <i data-lucide="brain-circuit" class="w-6 h-6"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-2xl font-bold text-white">Informasi Model AI</h2>
+                            <p class="text-sm text-neutral-400">Status model produksi saat ini.</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        <!-- Model Details -->
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-neutral-300 uppercase tracking-wider mb-4 border-b border-white/10 pb-2">Identitas Model</h3>
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-sm text-neutral-400">Algoritma</span>
+                                <span class="text-sm font-semibold text-white bg-white/5 px-3 py-1 rounded-lg" id="modType">XGBRegressor</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-sm text-neutral-400">Versi (Diperbarui)</span>
+                                <span class="text-sm font-semibold text-white" id="modVersion">--</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-sm text-neutral-400">Data Training</span>
+                                <span class="text-sm font-semibold text-white" id="modData">-- records</span>
+                            </div>
+                            <div class="flex justify-between items-center py-2">
+                                <span class="text-sm text-neutral-400">Fitur Digunakan</span>
+                                <span class="text-sm font-semibold text-white" id="modFeatures">--</span>
+                            </div>
+                        </div>
+
+                        <!-- Performance Metrics -->
+                        <div class="space-y-4">
+                            <h3 class="text-sm font-bold text-neutral-300 uppercase tracking-wider mb-4 border-b border-white/10 pb-2">Performa (Test Set)</h3>
+                            
+                            <div class="glass-card rounded-xl p-4 flex justify-between items-center">
+                                <div>
+                                    <p class="text-xs text-neutral-400 mb-1">Mean Absolute Error (MAE)</p>
+                                    <p class="text-xs text-neutral-500">Rata-rata kesalahan prediksi</p>
+                                </div>
+                                <div class="text-right">
+                                    <span id="modMae" class="text-xl font-bold text-neutral-400">--</span>
+                                    <span class="text-xs text-neutral-500 block">µg/m³</span>
+                                </div>
+                            </div>
+                            
+                            <div class="glass-card rounded-xl p-4 flex justify-between items-center">
+                                <div>
+                                    <p class="text-xs text-neutral-400 mb-1">R² Score (Akurasi)</p>
+                                    <p class="text-xs text-neutral-500">Kesesuaian varians data</p>
+                                </div>
+                                <div class="text-right">
+                                    <span id="modR2" class="text-xl font-bold text-neutral-300">--</span>
+                                    <span class="text-xs text-neutral-500 block">Scale 0-1</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-8 pt-6 border-t border-white/10 text-center">
+                        <p class="text-xs text-neutral-500">
+                            Untuk evaluasi mendalam, tuning hyperparameter, dan feature importance, 
+                            silakan akses <a href="/eval/" target="_blank" class="text-neutral-300 hover:underline">Dashboard Evaluasi (Internal)</a>.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ========================================================= -->
+        <!-- 5. HEALTH RECOMMENDATIONS TAB -->
+        <!-- ========================================================= -->
+        <section id="page-health" class="page-section animate-slide-up hidden">
+            <div class="max-w-5xl mx-auto space-y-6">
+                <!-- Current Status Banner -->
+                <div id="healthBanner" class="rounded-3xl p-6 md:p-8 flex flex-col md:flex-row items-center gap-8 relative overflow-hidden" style="background: rgba(0,228,0,0.1); border: 1px solid rgba(0,228,0,0.2);">
+                    <div class="absolute right-0 top-0 opacity-10 scale-150 transform translate-x-1/4 -translate-y-1/4">
+                        <i id="healthIconLarge" data-lucide="check-circle" class="w-64 h-64"></i>
+                    </div>
+                    
+                    <div class="text-center md:text-left z-10 flex-shrink-0">
+                        <p class="text-sm font-bold tracking-widest uppercase mb-2 opacity-80">Status Saat Ini</p>
+                        <h2 id="healthCategoryTitle" class="text-3xl md:text-5xl font-black mb-2">Baik</h2>
+                        <div class="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-md">
+                            <span class="text-sm font-medium opacity-90">AQI:</span>
+                            <span id="healthAqiValue" class="text-lg font-bold">--</span>
+                        </div>
+                    </div>
+                    
+                    <div class="z-10 flex-grow">
+                        <p id="healthGeneralMsg" class="text-lg font-medium leading-relaxed opacity-90">
+                            Memuat rekomendasi kesehatan...
+                        </p>
+                    </div>
+                </div>
+
+                <!-- Detailed Recommendations Grid -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- Groups -->
+                    <div class="glass-panel rounded-3xl p-6 md:p-8 space-y-6">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-3">
+                            <i data-lucide="users" class="w-5 h-5 text-neutral-300"></i> Rekomendasi Kelompok
+                        </h3>
+                        
+                        <div class="space-y-4">
+                            <div>
+                                <h4 class="text-sm font-semibold text-neutral-300 mb-1">Masyarakat Umum</h4>
+                                <p id="recOutdoor" class="text-sm text-neutral-400 leading-relaxed">--</p>
+                            </div>
+                            <div class="h-px bg-white/5"></div>
+                            <div>
+                                <h4 class="text-sm font-semibold text-neutral-300 mb-1 text-orange-300">Kelompok Sensitif</h4>
+                                <p class="text-[10px] text-neutral-500 mb-1 uppercase tracking-wider">(Anak, Lansia, Riwayat Asma/Jantung)</p>
+                                <p id="recSensitive" class="text-sm text-neutral-400 leading-relaxed">--</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="glass-panel rounded-3xl p-6 md:p-8 space-y-6">
+                        <h3 class="text-lg font-bold text-white flex items-center gap-3">
+                            <i data-lucide="shield" class="w-5 h-5 text-neutral-400"></i> Panduan Aktivitas
+                        </h3>
+                        
+                        <div class="grid grid-cols-2 gap-4" id="healthActivityGrid">
+                            <!-- Populated by JS -->
+                        </div>
+                        
+                        <div class="mt-6 pt-4 border-t border-white/10">
+                            <h4 class="text-sm font-semibold text-neutral-300 mb-2">Tindakan Perlindungan:</h4>
+                            <ul id="recMeasures" class="space-y-2 text-sm text-neutral-400 list-disc list-inside">
+                                <li>--</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-white/5 bg-black/50 backdrop-blur-lg py-6 mt-auto">
+        <div class="max-w-7xl mx-auto px-4 text-center text-xs text-neutral-500">
+            <p>AirSense Production Environment &copy; 2026. Data by OpenAQ. Built with FastAPI & XGBoost.</p>
+        </div>
+    </footer>
+
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 z-[100] bg-black/80 backdrop-blur-sm hidden items-center justify-center">
+        <div class="glass-panel rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl border border-white/10 relative">
+            <button onclick="document.getElementById('loginModal').style.display='none'" class="absolute top-4 right-4 text-neutral-400 hover:text-white">
+                <i data-lucide="x" class="w-5 h-5"></i>
+            </button>
+            <div class="flex flex-col items-center mb-6">
+                <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-neutral-700 to-neutral-900 flex items-center justify-center shadow-lg mb-4">
+                    <i data-lucide="shield-check" class="text-white w-6 h-6"></i>
+                </div>
+                <h2 class="text-xl font-bold text-white">Login Laboratorium</h2>
+                <p class="text-xs text-neutral-400 text-center mt-1">Area khusus admin untuk evaluasi model</p>
+            </div>
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-neutral-400 mb-1">Username</label>
+                    <input type="text" id="adminUsername" required class="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-all">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-neutral-400 mb-1">Password</label>
+                    <input type="password" id="adminPassword" required class="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-neutral-500 focus:ring-1 focus:ring-neutral-500 transition-all">
+                </div>
+                <div id="loginError" class="text-xs text-red-400 hidden text-center">Username atau password salah</div>
+                <button type="submit" class="w-full bg-neutral-800 hover:bg-neutral-700 text-white font-medium py-2.5 rounded-xl transition-colors shadow-lg shadow-white/10 flex justify-center items-center gap-2 mt-2">
+                    <i data-lucide="log-in" class="w-4 h-4"></i> Masuk
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- JAVASCRIPT LOGIC -->
+    <!-- ========================================================= -->
+    <script>
+        async function handleLogin(event) {
+            event.preventDefault();
+            const u = document.getElementById('adminUsername').value;
+            const p = document.getElementById('adminPassword').value;
+            const err = document.getElementById('loginError');
+            
+            const formData = new FormData();
+            formData.append('username', u);
+            formData.append('password', p);
+
+            try {
+                const res = await fetch('/api/admin-login', {
+                    method: 'POST',
+                    body: formData
+                });
+                if (res.ok) {
+                    window.location.href = '/eval/';
+                } else {
+                    err.style.display = 'block';
+                }
+            } catch (e) {
+                err.textContent = 'Gagal terhubung ke server';
+                err.style.display = 'block';
+            }
+        }
+        // Init Lucide Icons
+        lucide.createIcons();
+
+        // State
+        const API_BASE = "/api";
+        let map = null;
+        let mapCircle = null;
+        let predictionChartObj = null;
+        let lastLoadedData = null;
+
+        // ==========================================
+        // 1. Navigation & UI Logic
+        // ==========================================
+        function switchTab(tabId) {
+            // Update Nav Classes
+            document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+
+            // Show/Hide Sections
+            document.querySelectorAll('.page-section').forEach(el => {
+                if (el.id !== `page-${tabId}`) {
+                    el.classList.remove('active');
+                    setTimeout(() => {
+                        if (!el.classList.contains('active')) {
+                            el.style.display = 'none';
+                        }
+                    }, 300); // fade out duration
+                }
+            });
+
+            const targetSection = document.getElementById(`page-${tabId}`);
+            targetSection.style.display = 'block';
+            // Trigger reflow
+            void targetSection.offsetWidth;
+            targetSection.classList.add('active');
+
+            // Render Map properly if it's the map tab
+            if (tabId === 'map' && map) {
+                setTimeout(() => map.invalidateSize(), 100);
+            }
+        }
+
+        function showLoading(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (show) {
+                overlay.style.display = 'flex';
+                setTimeout(() => overlay.style.opacity = '1', 10);
+            } else {
+                overlay.style.opacity = '0';
+                setTimeout(() => overlay.style.display = 'none', 300);
+            }
+        }
+
+        // ==========================================
+        // 2. Fetch Data
+        // ==========================================
+        async function fetchAllData() {
+            try {
+                // Fetch in parallel, don't let one failure break everything
+                const fetchJson = async (url) => {
+                    try {
+                        const res = await fetch(url);
+                        return await res.json();
+                    } catch (e) {
+                        console.error(`Failed to fetch ${url}`, e);
+                        return { status: 'error' };
+                    }
+                };
+
+                const [current, predictions, sysStats, health] = await Promise.all([
+                    fetchJson(`${API_BASE}/current`),
+                    fetchJson(`${API_BASE}/predictions`),
+                    fetchJson(`${API_BASE}/system-status`),
+                    fetchJson(`${API_BASE}/health-recs`)
+                ]);
+
+                if (current && current.status === 'ok') {
+                    updateDashboard(current, predictions.predictions);
+                    updateMap(current);
+                } else {
+                    document.getElementById('healthGeneralMsg').textContent = 'Gagal memuat data kualitas udara.';
+                }
+                
+                if (sysStats && sysStats.status === 'ok') updateSystemStatus(sysStats);
+                if (predictions && predictions.status === 'ok') updatePredictionTab(predictions);
+                if (health && health.status === 'ok') updateHealthTab(health);
+
+                // Fetch model info silently
+                fetchJson(`${API_BASE}/model-info`).then(m => {
+                    if (m && m.status === 'ok') updateModelTab(m, sysStats);
+                });
+
+                showLoading(false);
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                showLoading(false);
+            }
+        }
+
+        // ==========================================
+        // 3. Update UI Functions
+        // ==========================================
+        function updateDashboard(current, predictions) {
+            if (current.status !== 'ok') return;
+            
+            const data = current.data || {};
+            const aqi = current.aqi || {
+                aqi: '--',
+                category: 'Data Tidak Tersedia',
+                color: '#64748b'
+            };
+
+            // Main AQI
+            const aqiVal = document.getElementById('mainAqiValue');
+            const aqiBadge = document.getElementById('mainAqiBadge');
+            const ring = document.getElementById('mainAqiRing');
+
+            aqiVal.textContent = aqi.aqi;
+            aqiVal.style.color = aqi.color;
+            aqiBadge.textContent = aqi.category;
+            aqiBadge.style.color = aqi.color;
+            aqiBadge.style.backgroundColor = `${aqi.color}20`;
+            aqiBadge.style.borderColor = `${aqi.color}40`;
+
+            // Gauge animation
+            const maxAqi = 500;
+            const circumference = 534;
+            let progress = 0;
+            if (aqi.aqi !== '--') {
+                progress = Math.min(aqi.aqi / maxAqi, 1);
+            }
+            ring.style.strokeDashoffset = circumference * (1 - progress);
+            ring.style.stroke = aqi.color;
+
+            // Sensors
+            document.getElementById('dashPm25').textContent = data.pm25 != null ? data.pm25.toFixed(1) : '--';
+            document.getElementById('dashPm1').textContent = data.pm1 != null ? data.pm1.toFixed(1) : '--';
+            document.getElementById('dashTemp').textContent = data.temperature != null ? data.temperature.toFixed(1) : '--';
+            document.getElementById('dashHum').textContent = data.relativehumidity != null ? data.relativehumidity.toFixed(0) : '--';
+            document.getElementById('dashUm003').textContent = data.um003 != null ? Math.round(data.um003).toLocaleString() : '--';
+            
+            if (data.recorded_at) {
+                const dt = new Date(data.recorded_at);
+                document.getElementById('dashTime').textContent = `Update: ${dt.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'})} WIB`;
+            }
+
+            // Next hour prediction
+            if (predictions && predictions.length > 0) {
+                const next = predictions[0];
+                const predEl = document.getElementById('dashPredAqi');
+                if (predEl) {
+                    predEl.textContent = next.aqi_predicted ? next.aqi_predicted : '--';
+                    predEl.style.color = next.aqi_color || '';
+                }
+            }
+        }
+
+        function updateSystemStatus(stats) {
+            if (stats.status !== 'ok') return;
+            
+            const sys = stats.system || {};
+            const badgeText = document.getElementById('syncStatusText');
+            const pulse = document.getElementById('syncPulse');
+            const dot = document.getElementById('syncDot');
+
+            // Indicate system online status.
+            badgeText.textContent = 'System Online';
+            badgeText.className = 'text-xs font-medium text-neutral-400';
+            pulse.classList.add('animate-ping');
+            pulse.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75';
+            dot.className = 'relative inline-flex rounded-full h-2 w-2 bg-emerald-500';
+
+            // Footer info
+            if (sys.last_sync_time) {
+                document.getElementById('sysLastFetch').textContent = `Sync Terakhir: ${sys.last_sync_time.updated_at_display}`;
+            }
+            if (sys.last_training_time) {
+                document.getElementById('sysLastTrain').textContent = `Train Terakhir: ${sys.last_training_time.updated_at_display}`;
+            }
+        }
+
+        function updatePredictionTab(predData) {
+            if (predData.status !== 'ok' || !predData.predictions) return;
+            
+            const preds = predData.predictions;
+            const sum = predData.summary;
+
+            // Summary
+            if (sum.avg_aqi) {
+                const badge = document.getElementById('predAvgAqiBadge');
+                badge.textContent = sum.avg_aqi;
+                badge.style.color = sum.avg_color;
+                badge.style.border = `2px solid ${sum.avg_color}`;
+                
+                const cat = document.getElementById('predAvgCategory');
+                cat.textContent = sum.avg_category;
+                cat.style.color = sum.avg_color;
+
+                document.getElementById('predMin').textContent = sum.min_pm25.toFixed(1);
+                document.getElementById('predMax').textContent = sum.max_pm25.toFixed(1);
+            }
+
+            // List
+            const listEl = document.getElementById('predictionList');
+            listEl.innerHTML = '';
+            
+            const labels = [];
+            const dataVals = [];
+            const colors = [];
+
+            preds.forEach((p, idx) => {
+                const dt = new Date(p.target_time);
+                const timeStr = dt.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                const dateStr = dt.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'});
+                
+                labels.push(`${dateStr} ${timeStr}`);
+                dataVals.push(p.aqi_predicted);
+                colors.push(p.aqi_color || '#3b82f6');
+
+                const item = document.createElement('div');
+                item.className = 'flex items-center justify-between p-3 rounded-xl bg-white/5 border border-white/5';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-inner" style="background-color: ${p.aqi_color}">
+                            +${p.hour_offset}
+                        </div>
+                        <div>
+                            <p class="text-sm font-semibold text-white">${timeStr} WIB</p>
+                            <p class="text-[10px] text-neutral-300">${dateStr}</p>
+                            <p class="text-[10px] uppercase text-neutral-400 mt-0.5">${p.aqi_category}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-bold" style="color: ${p.aqi_color}">${p.aqi_predicted}</p>
+                        <p class="text-[10px] text-neutral-500 text-right">AQI</p>
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+
+            // Chart
+            const ctx = document.getElementById('predictionChart').getContext('2d');
+            if (predictionChartObj) predictionChartObj.destroy();
+
+            // Gradient for chart
+            const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.5)'); // Indigo 500
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.0)');
+
+            predictionChartObj = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Prediksi AQI',
+                        data: dataVals,
+                        borderColor: '#818cf8', // Indigo 400
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        pointBackgroundColor: colors,
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 6,
+                        pointHoverRadius: 8,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                            titleColor: '#fff',
+                            bodyColor: '#cbd5e1',
+                            borderColor: 'rgba(255,255,255,0.1)',
+                            borderWidth: 1,
+                            padding: 12,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(ctx) { return `AQI: ${ctx.raw}`; }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } }
+                        },
+                        y: { 
+                            grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false },
+                            ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } },
+                            beginAtZero: true,
+                            suggestedMax: Math.max(...dataVals) * 1.2
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateModelTab(info, sysStats) {
+            if (info.status !== 'ok' || !info.model) return;
+            const m = info.model;
+            const met = m.metrics;
+            
+            document.getElementById('modVersion').textContent = m.trained_at ? new Date(m.trained_at).toLocaleString('id-ID') : '--';
+            
+            if (sysStats && sysStats.dataset) {
+                document.getElementById('modData').textContent = `${sysStats.dataset.total_records.toLocaleString('id-ID')} records (Raw)`;
+            } else {
+                document.getElementById('modData').textContent = `${m.n_train + m.n_test} records (Clean)`;
+            }
+            
+            document.getElementById('modFeatures').textContent = m.n_features;
+            
+            if (met) {
+                document.getElementById('modMae').textContent = met.mae ? met.mae.toFixed(4) : '--';
+                document.getElementById('modR2').textContent = met.r2 ? met.r2.toFixed(4) : '--';
+            }
+        }
+
+        function updateHealthTab(healthData) {
+            if (healthData.status !== 'ok') return;
+            const recs = healthData.recommendations;
+            const curr = healthData.current;
+
+            // Banner
+            const banner = document.getElementById('healthBanner');
+            banner.style.backgroundColor = `${curr.color}15`;
+            banner.style.borderColor = `${curr.color}30`;
+            
+            document.getElementById('healthCategoryTitle').textContent = curr.category;
+            document.getElementById('healthCategoryTitle').style.color = curr.color;
+            document.getElementById('healthAqiValue').textContent = curr.aqi;
+            document.getElementById('healthAqiValue').style.color = curr.color;
+            
+            document.getElementById('healthGeneralMsg').textContent = recs.general;
+            
+            // Icon
+            const iconEl = document.getElementById('healthIconLarge');
+            iconEl.style.color = curr.color;
+            
+            // Text recommendations
+            document.getElementById('recOutdoor').textContent = recs.outdoor_activity;
+            document.getElementById('recSensitive').textContent = recs.sensitive_groups;
+
+            // Measures List
+            const listEl = document.getElementById('recMeasures');
+            listEl.innerHTML = '';
+            recs.protective_measures.forEach(m => {
+                const li = document.createElement('li');
+                li.textContent = m;
+                listEl.appendChild(li);
+            });
+
+            // Activity Grid
+            const gridEl = document.getElementById('healthActivityGrid');
+            gridEl.innerHTML = '';
+            
+            const activities = [
+                { id: 'olahraga_outdoor', label: 'Olahraga Outdoor', icon: 'activity' },
+                { id: 'aktivitas_anak', label: 'Aktivitas Anak', icon: 'baby' },
+                { id: 'lansia', label: 'Lansia', icon: 'user-plus' },
+                { id: 'ibu_hamil', label: 'Ibu Hamil', icon: 'heart' }
+            ];
+
+            activities.forEach(act => {
+                const info = recs.activity_guide[act.id];
+                if (!info) return;
+
+                const card = document.createElement('div');
+                card.className = 'glass-card rounded-2xl p-4 flex flex-col items-center justify-center text-center gap-2';
+                card.innerHTML = `
+                    <div class="w-10 h-10 rounded-full flex items-center justify-center" style="background-color: ${info.color}20; color: ${info.color}">
+                        <i data-lucide="${act.icon}" class="w-5 h-5"></i>
+                    </div>
+                    <p class="text-xs text-neutral-400 font-medium">${act.label}</p>
+                    <p class="text-sm font-bold" style="color: ${info.color}">${info.status}</p>
+                `;
+                gridEl.appendChild(card);
+            });
+
+            // Re-render new icons
+            lucide.createIcons();
+        }
+
+        // ==========================================
+        // 4. Map Setup
+        // ==========================================
+        function initMap() {
+            // Koordinat Stasiun USU
+            const lat = 3.5636;
+            const lon = 98.6559;
+
+            map = L.map('leafletMap', {
+                zoomControl: false,
+                attributionControl: false
+            }).setView([lat, lon], 13);
+
+            // Dark CartoDB basemap
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+                maxZoom: 19
+            }).addTo(map);
+            
+            // Custom Control
+            L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+            // Marker Stasiun
+            const customIcon = L.divIcon({
+                className: 'custom-div-icon',
+                html: `<div style="background-color:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow: 0 0 10px #3b82f6;"></div>`,
+                iconSize: [16, 16],
+                iconAnchor: [8, 8]
+            });
+
+            L.marker([lat, lon], {icon: customIcon})
+             .addTo(map)
+             .bindPopup('<b class="text-neutral-800">Stasiun USU Medan</b><br><span class="text-neutral-600">Pemantauan Kualitas Udara</span>');
+
+            // Initialize circle (radius 5km)
+            mapCircle = L.circle([lat, lon], {
+                color: '#3b82f6',
+                fillColor: '#3b82f6',
+                fillOpacity: 0.15,
+                radius: 5000,
+                weight: 1,
+                dashArray: '5, 5'
+            }).addTo(map);
+        }
+
+        function updateMap(current) {
+            if (!map || current.status !== 'ok') return;
+            const aqi = current.aqi;
+            
+            // Update circle color based on AQI
+            if (mapCircle && aqi) {
+                mapCircle.setStyle({
+                    color: aqi.color,
+                    fillColor: aqi.color,
+                    fillOpacity: 0.2
+                });
+                mapCircle.bindPopup(`<b style="color:${aqi.color}">${aqi.category}</b><br><span class="text-neutral-600">AQI: ${aqi.aqi} | PM2.5: ${current.data.pm25.toFixed(1)} µg/m³</span>`);
+            }
+        }
+
+        // ==========================================
+        // 5. App Lifecycle
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', () => {
+            showLoading(true);
+            initMap();
+            fetchAllData();
+
+            // Auto refresh every 5 minutes
+            setInterval(fetchAllData, 5 * 60 * 1000);
+        });
+
+    </script>
+</body>
+</html>

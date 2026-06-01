@@ -1,0 +1,28 @@
+# Environment
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Database
+*.db
+*.sqlite3
+data/air_quality.db
+
+# Model files (large)
+models/*.joblib
+models/pm25_xgboost_model_backup.joblib
+models/pm25_xgboost_model_new.joblib
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

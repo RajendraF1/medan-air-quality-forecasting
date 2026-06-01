@@ -1,0 +1,84 @@
+{
+  "model_type": "XGBRegressor",
+  "hyperparameters": {
+    "objective": "reg:squarederror",
+    "n_estimators": 1000,
+    "max_depth": 6,
+    "learning_rate": 0.05,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 3,
+    "gamma": 0.1,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "n_jobs": -1
+  },
+  "cv_scores": {
+    "mae_mean": 14.139341795853507,
+    "mae_std": 4.3962629953683905,
+    "rmse_mean": 18.53192039612531,
+    "rmse_std": 3.6378763513970194,
+    "r2_mean": -0.7749303606138234,
+    "r2_std": 1.1264818635649485,
+    "per_fold": {
+      "mae": [
+        9.595917486753823,
+        14.800109969018104,
+        21.4033506304305,
+        9.526874454185313,
+        15.370456438879806
+      ],
+      "rmse": [
+        12.866965131138507,
+        19.441374722540314,
+        24.242623410439414,
+        17.751365571609742,
+        18.35727314489859
+      ],
+      "r2": [
+        -0.009958609509488348,
+        0.03561320667901746,
+        -2.8908713108303568,
+        -0.015121663558561593,
+        -0.9943134258497279
+      ]
+    }
+  },
+  "final_metrics": {
+    "train": {
+      "mae": 7.797588547755042,
+      "rmse": 13.772659833855927,
+      "r2": 0.8526539147571447,
+      "mape": 37.95284768035889,
+      "max_error": 254.43335872226294,
+      "median_ae": 5.547365911079176
+    },
+    "test": {
+      "mae": 9.397639479634304,
+      "rmse": 11.79149950709495,
+      "r2": -1.1061786579318644,
+      "mape": 104.64847764123692,
+      "max_error": 214.49986877441407,
+      "median_ae": 8.46203489303589
+    }
+  },
+  "top_10_features": [
+    "pm25_rolling_std_3h",
+    "pm1_lag_1h",
+    "pm25_lag_12h",
+    "temperature_lag_3h",
+    "temperature",
+    "pm25_rolling_mean_24h",
+    "pm1",
+    "pm25_rolling_max_24h",
+    "temperature_lag_1h",
+    "um003"
+  ],
+  "n_features": 40,
+  "n_train": 2121,
+  "n_test": 909,
+  "best_iteration": 73,
+  "training_duration_seconds": 5.69,
+  "trained_at": "2026-06-01T18:02:27.668679+07:00"
+}

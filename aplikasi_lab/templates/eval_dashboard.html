@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="id" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AirSense — Dashboard Evaluasi Model</title>
+    <meta name="description" content="Dashboard internal untuk evaluasi, training, dan monitoring model AI prediksi kualitas udara PM2.5.">
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                    },
+                    animation: {
+                        'pulse-slow': 'pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'fade-in': 'fadeIn 0.5s ease-out',
+                        'slide-up': 'slideUp 0.4s ease-out',
+                    },
+                    keyframes: {
+                        fadeIn: { '0%': { opacity: '0' }, '100%': { opacity: '1' } },
+                        slideUp: { '0%': { opacity: '0', transform: 'translateY(16px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; background: #050505; }
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .glass { background: rgba(255,255,255,0.04); backdrop-filter: blur(12px); border: 1px solid rgba(255,255,255,0.07); }
+        .glass-strong { background: rgba(255,255,255,0.07); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.1); }
+        .tab-active { background: linear-gradient(135deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05)); border-color: rgba(255,255,255,0.2); color: #fff; }
+        .tab-inactive:hover { background: rgba(255,255,255,0.04); }
+        .progress-bar { transition: width 0.5s ease-in-out; }
+        .metric-card { transition: transform 0.2s, box-shadow 0.2s; }
+        .metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .badge-best { background: linear-gradient(135deg, #10b981, #059669); }
+        .badge-stable { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .badge-drop { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .status-green { color: #10b981; }
+        .status-yellow { color: #eab308; }
+        .status-orange { color: #f97316; }
+        .status-red { color: #ef4444; }
+        .status-dot-green { background: #10b981; }
+        .status-dot-yellow { background: #eab308; }
+        .status-dot-orange { background: #f97316; }
+        .status-dot-red { background: #ef4444; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: #050505; }
+        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
+        @keyframes shimmer { 0% { background-position: -200px 0; } 100% { background-position: calc(200px + 100%) 0; } }
+        .shimmer { animation: shimmer 1.5s infinite; background: linear-gradient(90deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 100%); background-size: 200px 100%; }
+    </style>
+</head>
+<body class="min-h-screen text-white antialiased">
+
+    <!-- Background -->
+    <div class="fixed inset-0 overflow-hidden pointer-events-none -z-10">
+        <div class="absolute top-0 -left-32 w-96 h-96 bg-white/[0.02] rounded-full blur-3xl"></div>
+        <div class="absolute bottom-0 -right-32 w-[500px] h-[500px] bg-white/[0.02] rounded-full blur-3xl"></div>
+        <div class="absolute top-1/2 left-1/2 w-72 h-72 bg-transparent rounded-full blur-3xl"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="sticky top-0 z-50 glass border-b border-white/5">
+        <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-neutral-800 to-neutral-900 flex items-center justify-center shadow-lg shadow-white/5">
+                    <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-neutral-400">
+                        Model Evaluation Lab
+                    </h1>
+                    <p class="text-[10px] text-neutral-500 uppercase tracking-widest">AirSense • Internal Developer Dashboard • Location ID: <span class="text-neutral-300 font-semibold">5586536</span></p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] text-neutral-500 mono" id="headerClock"></span>
+                <a href="/" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-xs font-medium text-white transition-colors border border-neutral-800 mr-2">
+                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+                    Dashboard Utama
+                </a>
+                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-medium glass">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-emerald-400">Dev Mode</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="max-w-[1600px] mx-auto px-4 sm:px-6 py-6 flex gap-6">
+
+        <!-- Sidebar Navigation -->
+        <nav class="w-56 shrink-0 hidden lg:block">
+            <div class="sticky top-20 space-y-1">
+                <button onclick="switchTab('overview')" id="tab-overview" class="tab-btn tab-active w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
+                    Overview
+                </button>
+                <button onclick="switchTab('data')" id="tab-data" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    Collect Data
+                </button>
+                <button onclick="switchTab('monitoring')" id="tab-monitoring" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                    Dataset Monitoring
+                </button>
+                <button onclick="switchTab('analysis')" id="tab-analysis" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                    Analisis Dataset
+                </button>
+                <button onclick="switchTab('preprocessing')" id="tab-preprocessing" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    Preprocessing
+                </button>
+                <button onclick="switchTab('training')" id="tab-training" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Training
+                </button>
+                <button onclick="switchTab('evaluation')" id="tab-evaluation" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    Evaluasi
+                </button>
+                <button onclick="switchTab('features')" id="tab-features" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                    Feature Importance
+                </button>
+                
+                <button onclick="switchTab('experiments')" id="tab-experiments" class="tab-btn tab-inactive w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium text-neutral-400 transition-all">
+                    <svg class="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                    Experiment History
+                </button>
+            </div>
+        </nav>
+
+        <!-- Mobile Tab Bar -->
+        <div class="lg:hidden fixed bottom-0 left-0 right-0 z-50 glass border-t border-white/5 flex overflow-x-auto">
+            <button onclick="switchTab('overview')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Overview</button>
+            <button onclick="switchTab('data')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Data</button>
+            <button onclick="switchTab('monitoring')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Monitor</button>
+            <button onclick="switchTab('analysis')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Analisis</button>
+            <button onclick="switchTab('training')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Training</button>
+            <button onclick="switchTab('evaluation')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">Evaluasi</button>
+            <button onclick="switchTab('experiments')" class="flex-1 min-w-[60px] py-3 text-center text-[10px] text-neutral-400">History</button>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 min-w-0 space-y-6 pb-20 lg:pb-0">
+
+            <!-- ==================== OVERVIEW TAB ==================== -->
+            <div id="panel-overview" class="tab-panel animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Overview</h2>
+                        <p class="text-sm text-neutral-400 mt-1">Ringkasan status sistem evaluasi model • Location ID: <span class="text-neutral-300 mono font-semibold">5586536</span></p>
+                    </div>
+                </div>
+
+                <!-- Quick Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">Dataset</div>
+                        <p id="ov-dataset-records" class="text-2xl font-bold text-white">--</p>
+                        <p id="ov-dataset-range" class="text-xs text-neutral-500 mt-1">--</p>
+                    </div>
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">Model R²</div>
+                        <p id="ov-r2" class="text-2xl font-bold text-emerald-400">--</p>
+                        <p class="text-xs text-neutral-500 mt-1">Test set performance</p>
+                    </div>
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">MAE</div>
+                        <p id="ov-mae" class="text-2xl font-bold text-neutral-400">--</p>
+                        <p class="text-xs text-neutral-500 mt-1">µg/m³ test error</p>
+                    </div>
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">Features</div>
+                        <p id="ov-features" class="text-2xl font-bold text-neutral-400">--</p>
+                        <p class="text-xs text-neutral-500 mt-1">Total fitur model</p>
+                    </div>
+                </div>
+
+                <!-- Sync Status Quick -->
+                <div class="glass-strong rounded-xl p-5" id="ov-sync-status">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-3 h-3 rounded-full bg-neutral-500" id="ov-sync-dot"></div>
+                            <div>
+                                <p class="text-sm font-medium text-white" id="ov-sync-message">Memeriksa status sinkronisasi...</p>
+                                <p class="text-xs text-neutral-400 mt-0.5" id="ov-sync-detail">--</p>
+                            </div>
+                        </div>
+                        <span class="text-xs text-neutral-500 mono" id="ov-sync-gap">--</span>
+                    </div>
+                </div>
+
+                <!-- Pipeline Status -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Pipeline Status</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                        <div class="text-center">
+                            <div id="ov-status-data" class="w-10 h-10 mx-auto rounded-full bg-neutral-800/50 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                            </div>
+                            <p class="text-xs text-neutral-400">Data</p>
+                        </div>
+                        <div class="text-center">
+                            <div id="ov-status-preprocess" class="w-10 h-10 mx-auto rounded-full bg-neutral-800/50 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </div>
+                            <p class="text-xs text-neutral-400">Preprocessing</p>
+                        </div>
+                        <div class="text-center">
+                            <div id="ov-status-train" class="w-10 h-10 mx-auto rounded-full bg-neutral-800/50 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <p class="text-xs text-neutral-400">Training</p>
+                        </div>
+                        <div class="text-center">
+                            <div id="ov-status-eval" class="w-10 h-10 mx-auto rounded-full bg-neutral-800/50 flex items-center justify-center mb-2">
+                                <svg class="w-5 h-5 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            </div>
+                            <p class="text-xs text-neutral-400">Evaluasi</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Live Prediction Test -->
+                <div class="glass-strong rounded-xl p-6 mt-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Simulasi Prediksi 24 Jam (Live)</h3>
+                            <p class="text-xs text-neutral-400">Hasil perhitungan mentah prediksi PM2.5 untuk 48 jam ke depan</p>
+                        </div>
+                        <button onclick="loadLivePrediction()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-neutral-900 hover:bg-neutral-800 text-xs font-medium text-white transition-colors border border-neutral-800">
+                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <div class="h-64">
+                        <canvas id="chartLivePrediction"></canvas>
+                    </div>
+                    <div id="livePredictionMsg" class="text-xs text-neutral-500 text-center mt-2"></div>
+                </div>
+            </div>
+
+            <!-- ==================== COLLECT DATA TAB ==================== -->
+            <div id="panel-data" class="tab-panel hidden animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Collect Data</h2>
+                        <p class="text-sm text-neutral-400 mt-1">Sinkronisasi dataset dari OpenAQ API • Location ID: <span class="text-neutral-300 mono font-semibold">5586536</span></p>
+                    </div>
+                    <button onclick="startSyncData()" id="btnFetch" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-500 text-white text-sm font-medium transition-all active:scale-95">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Sinkronisasi Dataset
+                    </button>
+                </div>
+
+                <!-- Dataset Stats -->
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="dataStatsCards">
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total Hari Dataset</div>
+                        <p id="ds-total-days" class="text-2xl font-bold text-white">--</p>
+                    </div>
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total File CSV</div>
+                        <p id="ds-total-files" class="text-2xl font-bold text-neutral-400">--</p>
+                        <p class="text-xs text-neutral-500 mt-1">di data/kualitas_udara/</p>
+                    </div>
+                    <div class="glass rounded-xl p-4 metric-card">
+                        <div class="text-xs text-neutral-400 uppercase tracking-wider mb-1">Total Record</div>
+                        <p id="ds-total-records" class="text-2xl font-bold text-emerald-400">--</p>
+                        <p class="text-xs text-neutral-500 mt-1">data mentah</p>
+                    </div>
+                </div>
+
+                <!-- Fetch Progress -->
+                <div id="fetchProgress" class="glass-strong rounded-xl p-6 hidden">
+                    <div class="flex items-center justify-between mb-3">
+                        <span class="text-sm font-medium text-white">Progress Sinkronisasi</span>
+                        <span id="fetchPct" class="text-sm font-bold text-neutral-300 mono">0%</span>
+                    </div>
+                    <div class="w-full bg-neutral-800/50 rounded-full h-2.5 mb-3">
+                        <div id="fetchBar" class="progress-bar bg-gradient-to-r from-neutral-500 to-neutral-500 h-2.5 rounded-full" style="width: 0%"></div>
+                    </div>
+                    <p id="fetchMessage" class="text-xs text-neutral-400"></p>
+                </div>
+
+                <!-- Dataset Info -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Dataset Tersedia</h3>
+                    <div id="datasetInfo" class="space-y-3">
+                        <p class="text-sm text-neutral-400">Memuat informasi dataset...</p>
+                    </div>
+                </div>
+
+                <!-- Fetch History -->
+                <div class="glass rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Riwayat Sinkronisasi</h3>
+                    <div id="fetchHistory" class="overflow-x-auto">
+                        <p class="text-sm text-neutral-400">Memuat...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== DATASET MONITORING TAB ==================== -->
+            <div id="panel-monitoring" class="tab-panel hidden animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Dataset Monitoring</h2>
+                        <p class="text-sm text-neutral-400 mt-1">Monitoring kualitas dan status dataset lokal</p>
+                    </div>
+                    <button onclick="loadDatasetMonitoring()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-900/20 border border-neutral-500/30 text-neutral-300 text-sm font-medium hover:bg-neutral-800/30 transition-all">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+
+                <!-- Dataset Summary -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Dataset Summary</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-5 gap-4" id="monSummary">
+                        <div class="glass rounded-lg p-3 text-center">
+                            <div class="text-xs text-neutral-400 mb-1">Location ID</div>
+                            <p class="text-lg font-bold text-neutral-300 mono" id="mon-location">5586536</p>
+                        </div>
+                        <div class="glass rounded-lg p-3 text-center">
+                            <div class="text-xs text-neutral-400 mb-1">Total Record</div>
+                            <p class="text-lg font-bold text-white" id="mon-records">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-3 text-center">
+                            <div class="text-xs text-neutral-400 mb-1">Total Hari</div>
+                            <p class="text-lg font-bold text-white" id="mon-days">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-3 text-center">
+                            <div class="text-xs text-neutral-400 mb-1">Total File CSV</div>
+                            <p class="text-lg font-bold text-white" id="mon-files">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-3 text-center">
+                            <div class="text-xs text-neutral-400 mb-1">Rentang Data</div>
+                            <p class="text-xs font-semibold text-white" id="mon-range">--</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Synchronization Status -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Synchronization Status</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" id="monSync">
+                        <div class="glass rounded-lg p-4">
+                            <div class="text-xs text-neutral-400 mb-1">Timestamp Lokal Terakhir</div>
+                            <p class="text-sm font-semibold text-white" id="mon-sync-local">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-4">
+                            <div class="text-xs text-neutral-400 mb-1">Waktu Saat Ini (WIB)</div>
+                            <p class="text-sm font-semibold text-white" id="mon-sync-current">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-4">
+                            <div class="text-xs text-neutral-400 mb-1">Selisih Waktu</div>
+                            <p class="text-sm font-bold" id="mon-sync-gap">--</p>
+                        </div>
+                        <div class="glass rounded-lg p-4">
+                            <div class="text-xs text-neutral-400 mb-1">Status Sinkronisasi</div>
+                            <p class="text-sm font-bold" id="mon-sync-status">--</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- File Status Table -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">File Status</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10">
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Nama File CSV</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">Jumlah Record</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">Ukuran File</th>
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Update Terakhir</th>
+                                </tr>
+                            </thead>
+                            <tbody id="monFileTable">
+                                <tr><td colspan="4" class="py-4 text-center text-neutral-400 text-xs">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Data Integrity Validation -->
+                <div class="glass-strong rounded-xl p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-white uppercase tracking-wider">Data Integrity Validation</h3>
+                        <button onclick="loadDataValidation()" class="text-xs text-neutral-300 hover:text-neutral-200 transition-colors">Jalankan Validasi</button>
+                    </div>
+                    <div id="monValidation" class="space-y-3">
+                        <p class="text-sm text-neutral-400">Klik "Jalankan Validasi" untuk memeriksa integritas dataset...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ==================== ANALYSIS TAB ==================== -->
+            <div id="panel-analysis" class="tab-panel hidden animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h2 class="text-2xl font-bold text-white">Analisis Dataset</h2>
+                        <p class="text-sm text-neutral-400 mt-1">Kualitas data, distribusi, dan missing values</p>
+                    </div>
+                    <button onclick="loadDataQuality()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-900/20 border border-neutral-500/30 text-neutral-300 text-sm font-medium hover:bg-neutral-800/30 transition-all">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Refresh
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-4" id="analysisSummary">
+                    <div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Jumlah Data</div><p id="an-total" class="text-xl font-bold text-white">--</p></div>
+                    <div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Jumlah Fitur</div><p id="an-features" class="text-xl font-bold text-white">--</p></div>
+                    <div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Rentang Waktu</div><p id="an-daterange" class="text-sm font-bold text-white">--</p></div>
+                    <div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Interval</div><p id="an-interval" class="text-xl font-bold text-white">--</p></div>
+                </div>
+                <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Missing Value Analysis</h3><div id="missingValues" class="space-y-3"><p class="text-sm text-neutral-400">Jalankan analisis untuk melihat hasil...</p></div></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">Distribusi PM2.5</h3><div class="h-64"><canvas id="chartPm25Dist"></canvas></div></div>
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">PM2.5 per Jam</h3><div class="h-64"><canvas id="chartByHour"></canvas></div></div>
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">PM2.5 per Hari</h3><div class="h-64"><canvas id="chartByDay"></canvas></div></div>
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">PM2.5 per Bulan</h3><div class="h-64"><canvas id="chartByMonth"></canvas></div></div>
+                </div>
+                <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Data Quality Report</h3><div id="qualityReport" class="grid grid-cols-2 sm:grid-cols-4 gap-4"><div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400 mb-1">Duplikasi</div><p id="qr-dup" class="text-lg font-bold text-white">--</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400 mb-1">Missing Values</div><p id="qr-missing" class="text-lg font-bold text-white">--</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400 mb-1">Outliers</div><p id="qr-outlier" class="text-lg font-bold text-white">--</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400 mb-1">Gap Timestamp</div><p id="qr-gap" class="text-lg font-bold text-white">--</p></div></div></div>
+            </div>
+
+            <!-- ==================== PREPROCESSING TAB ==================== -->
+            <div id="panel-preprocessing" class="tab-panel hidden animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div><h2 class="text-2xl font-bold text-white">Preprocessing</h2><p class="text-sm text-neutral-400 mt-1">Feature engineering khusus time series</p></div>
+                    <button onclick="runPreprocessing()" id="btnPreprocess" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-neutral-900 hover:bg-neutral-500 text-white text-sm font-medium transition-all active:scale-95"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Jalankan Preprocessing</button>
+                </div>
+                <div id="prepLog" class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Preprocessing Log</h3><div id="prepLogContent" class="space-y-3"><p class="text-sm text-neutral-400">Jalankan preprocessing untuk melihat log...</p></div></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass rounded-xl p-5"><h4 class="text-sm font-semibold text-neutral-400 mb-3">⏰ Fitur Waktu</h4><div class="space-y-1 text-xs text-neutral-300"><p>• hour_sin, hour_cos (cyclical encoding)</p><p>• dow_sin, dow_cos (day of week)</p><p>• is_weekend, month</p></div></div>
+                    <div class="glass rounded-xl p-5"><h4 class="text-sm font-semibold text-orange-400 mb-3">🚗 Rush Hour</h4><div class="space-y-1 text-xs text-neutral-300"><p>• rush_hour_pagi (06:00 – 09:00)</p><p>• rush_hour_sore (16:00 – 20:00)</p></div></div>
+                    <div class="glass rounded-xl p-5"><h4 class="text-sm font-semibold text-neutral-400 mb-3">⏪ Lag Features</h4><div class="space-y-1 text-xs text-neutral-300"><p>• PM2.5: t-1, t-2, t-3, t-6, t-12, t-24</p><p>• PM1, Temperature, Humidity, UM003: t-1, t-3</p></div></div>
+                    <div class="glass rounded-xl p-5"><h4 class="text-sm font-semibold text-emerald-400 mb-3">📊 Rolling Features</h4><div class="space-y-1 text-xs text-neutral-300"><p>• Rolling Mean: 3h, 6h, 12h, 24h</p><p>• Rolling Std: 3h, 6h, 12h, 24h</p><p>• Rolling Min/Max: 24h</p></div></div>
+                </div>
+            </div>
+
+            <!-- ==================== TRAINING TAB ==================== -->
+            <div id="panel-training" class="tab-panel hidden animate-fade-in space-y-6">
+                <div class="flex items-center justify-between">
+                    <div><h2 class="text-2xl font-bold text-white">Training Model</h2><p class="text-sm text-neutral-400 mt-1">XGBoost training dengan TimeSeriesSplit CV</p></div>
+                    <button onclick="startTraining()" id="btnTrain" class="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-gradient-to-r from-neutral-600 to-neutral-600 hover:from-neutral-500 hover:to-neutral-500 text-white text-sm font-semibold transition-all active:scale-95 shadow-lg shadow-white/5"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Mulai Training</button>
+                </div>
+
+                <!-- Validation Warning -->
+                <div id="trainValidation" class="hidden"></div>
+
+                <!-- Training Progress -->
+                <div id="trainProgress" class="glass-strong rounded-xl p-6 hidden">
+                    <div class="flex items-center justify-between mb-3"><span class="text-sm font-medium text-white">Training Progress</span><span id="trainPct" class="text-sm font-bold text-neutral-300 mono">0%</span></div>
+                    <div class="w-full bg-neutral-800/50 rounded-full h-2.5 mb-3"><div id="trainBar" class="progress-bar bg-gradient-to-r from-neutral-500 to-neutral-500 h-2.5 rounded-full" style="width: 0%"></div></div>
+                    <p id="trainMessage" class="text-xs text-neutral-400"></p>
+                    <div class="flex items-center gap-2 mt-4">
+                        <div id="step-validation" class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] bg-neutral-800/50 text-neutral-400"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span> Validasi</div>
+                        <div id="step-loading" class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] bg-neutral-800/50 text-neutral-400"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span> Loading</div>
+                        <div id="step-preprocessing" class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] bg-neutral-800/50 text-neutral-400"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span> Preprocessing</div>
+                        <div id="step-training" class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] bg-neutral-800/50 text-neutral-400"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span> Training</div>
+                        <div id="step-evaluating" class="flex items-center gap-1.5 px-2 py-1 rounded text-[10px] bg-neutral-800/50 text-neutral-400"><span class="w-1.5 h-1.5 rounded-full bg-neutral-500"></span> Evaluasi</div>
+                    </div>
+                </div>
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Konfigurasi Model (Hyperparameters)</h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 text-sm" id="trainConfig">
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">Model</label>
+                            <input type="text" value="XGBRegressor" disabled class="w-full bg-neutral-900/50 border border-neutral-600 rounded px-2 py-1 text-white opacity-70">
+                        </div>
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">Estimators</label>
+                            <input type="number" id="hp-estimators" value="1000" class="w-full bg-neutral-900 border border-neutral-600 rounded px-2 py-1 text-white focus:outline-none focus:border-neutral-500">
+                        </div>
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">Max Depth</label>
+                            <input type="number" id="hp-max-depth" value="6" class="w-full bg-neutral-900 border border-neutral-600 rounded px-2 py-1 text-white focus:outline-none focus:border-neutral-500">
+                        </div>
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">Learning Rate</label>
+                            <input type="number" step="0.01" id="hp-lr" value="0.05" class="w-full bg-neutral-900 border border-neutral-600 rounded px-2 py-1 text-white focus:outline-none focus:border-neutral-500">
+                        </div>
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">CV Splits</label>
+                            <input type="text" value="5 (TimeSeriesSplit)" disabled class="w-full bg-neutral-900/50 border border-neutral-600 rounded px-2 py-1 text-white opacity-70">
+                        </div>
+                        <div class="glass rounded-lg p-3">
+                            <label class="text-xs text-neutral-400 block mb-1">Test Split (%)</label>
+                            <input type="number" id="hp-test-split" value="20" min="5" max="50" class="w-full bg-neutral-900 border border-neutral-600 rounded px-2 py-1 text-white focus:outline-none focus:border-neutral-500">
+                        </div>
+                    </div>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="trainInfo"><div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Data Train</div><p id="tr-ntrain" class="text-xl font-bold text-white">--</p></div><div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Data Test</div><p id="tr-ntest" class="text-xl font-bold text-white">--</p></div><div class="glass rounded-xl p-4 metric-card"><div class="text-xs text-neutral-400 uppercase mb-1">Lama Training</div><p id="tr-duration" class="text-xl font-bold text-white">--</p></div></div>
+            </div>
+
+            <!-- ==================== EVALUATION TAB ==================== -->
+            <div id="panel-evaluation" class="tab-panel hidden animate-fade-in space-y-6">
+                <div><h2 class="text-2xl font-bold text-white">Evaluasi Model</h2><p class="text-sm text-neutral-400 mt-1">Metrik performa dan visualisasi prediksi</p></div>
+                <div class="grid grid-cols-2 xl:grid-cols-4 gap-4">
+                    <div class="glass-strong rounded-xl p-5 metric-card"><div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">MAE</div><p id="ev-mae" class="text-3xl font-bold text-neutral-400">--</p><p class="text-xs text-neutral-500 mt-1">µg/m³</p></div>
+                    <div class="glass-strong rounded-xl p-5 metric-card"><div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">RMSE</div><p id="ev-rmse" class="text-3xl font-bold text-orange-400">--</p><p class="text-xs text-neutral-500 mt-1">µg/m³</p></div>
+                    <div class="glass-strong rounded-xl p-5 metric-card"><div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">R²</div><p id="ev-r2" class="text-3xl font-bold text-emerald-400">--</p><p class="text-xs text-neutral-500 mt-1">Score</p></div>
+                    <div class="glass-strong rounded-xl p-5 metric-card"><div class="text-xs text-neutral-400 uppercase tracking-wider mb-2">MAPE</div><p id="ev-mape" class="text-3xl font-bold text-neutral-400">--</p><p class="text-xs text-neutral-500 mt-1">%</p></div>
+                </div>
+                <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">Actual vs Predicted (Test Set)</h3><div class="h-80"><canvas id="chartActualPred"></canvas></div></div>
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">Error Distribution</h3><div class="h-64"><canvas id="chartErrorDist"></canvas></div></div>
+                    <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4">Residual Plot</h3><div class="h-64"><canvas id="chartResidual"></canvas></div></div>
+                </div>
+            </div>
+
+            <!-- ==================== FEATURE IMPORTANCE TAB ==================== -->
+            <div id="panel-features" class="tab-panel hidden animate-fade-in space-y-6">
+                <div><h2 class="text-2xl font-bold text-white">Feature Importance</h2><p class="text-sm text-neutral-400 mt-1">Ranking fitur berdasarkan kontribusi terhadap prediksi</p></div>
+                <div class="glass-strong rounded-xl p-6"><div class="h-[500px]"><canvas id="chartFeatureImp"></canvas></div></div>
+                <div class="glass-strong rounded-xl p-6"><h3 class="text-sm font-semibold text-white mb-4 uppercase tracking-wider">Tabel Feature Importance</h3><div class="overflow-x-auto"><table class="w-full text-sm" id="featureTable"><thead><tr class="border-b border-white/10"><th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Rank</th><th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Fitur</th><th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">Importance</th><th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium w-1/3">Bar</th></tr></thead><tbody id="featureTableBody"><tr><td colspan="4" class="py-4 text-center text-neutral-400 text-xs">Memuat data...</td></tr></tbody></table></div></div>
+            </div>
+
+            <!-- ==================== HORIZON TAB ==================== -->
+            <!-- ==================== EXPERIMENT HISTORY TAB ==================== -->
+            <div id="panel-experiments" class="tab-panel hidden animate-fade-in space-y-6">
+                <div>
+                    <h2 class="text-2xl font-bold text-white">Experiment History</h2>
+                    <p class="text-sm text-neutral-400 mt-1">Riwayat lengkap semua eksperimen training dan evaluasi</p>
+                </div>
+
+                <div class="glass-strong rounded-xl p-6">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10">
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">ID</th>
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Tanggal Training</th>
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Model</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">Data</th>
+                                    <th class="text-left py-2 px-3 text-xs text-neutral-400 font-medium">Rentang Data</th>
+                                    
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">MAE</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">RMSE</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">R²</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">MAPE</th>
+                                    <th class="text-center py-2 px-3 text-xs text-neutral-400 font-medium">Status</th>
+                                    <th class="text-right py-2 px-3 text-xs text-neutral-400 font-medium">Durasi</th>
+                                </tr>
+                            </thead>
+                            <tbody id="experimentsTableBody">
+                                <tr><td colspan="12" class="py-6 text-center text-neutral-400 text-xs">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Experiment Comparison Chart -->
+                <div class="glass-strong rounded-xl p-6">
+                    <h3 class="text-sm font-semibold text-white mb-4">Perbandingan MAE antar Eksperimen</h3>
+                    <div class="h-64"><canvas id="chartExpComparison"></canvas></div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- ==================== JAVASCRIPT ==================== -->
+    <script>
+        const API = '/eval/api';
+        const charts = {};
+
+        // ===== TAB SWITCHING =====
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => {
+                b.classList.remove('tab-active');
+                b.classList.add('tab-inactive', 'text-neutral-400');
+            });
+            const panel = document.getElementById(`panel-${tab}`);
+            const btn = document.getElementById(`tab-${tab}`);
+            if (panel) { panel.classList.remove('hidden'); panel.classList.add('animate-fade-in'); }
+            if (btn) { btn.classList.add('tab-active'); btn.classList.remove('tab-inactive', 'text-neutral-400'); }
+
+            if (tab === 'analysis') loadDataQuality();
+            if (tab === 'evaluation') loadEvaluation();
+            if (tab === 'features') loadFeatureImportance();
+            
+            if (tab === 'experiments') loadExperiments();
+            if (tab === 'data') loadDatasetInfo();
+            if (tab === 'training') loadTrainingInfo();
+            if (tab === 'preprocessing') loadPreprocessingLog();
+            if (tab === 'monitoring') loadDatasetMonitoring();
+        }
+
+        // ===== CLOCK (WIB) =====
+        function updateClock() {
+            const now = new Date();
+            const wib = new Date(now.getTime() + (7 * 60 - now.getTimezoneOffset()) * 60 * 1000);
+            document.getElementById('headerClock').textContent =
+                wib.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) + ' ' +
+                wib.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + ' WIB';
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        // ===== CHART HELPERS =====
+        const chartColors = { blue: '#3b82f6', purple: '#a855f7', emerald: '#10b981', orange: '#f97316', pink: '#ec4899', cyan: '#06b6d4', indigo: '#6366f1', yellow: '#eab308' };
+        const chartDefaults = {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#94a3b8', font: { size: 11, family: 'Inter' }, usePointStyle: true, padding: 16 } } },
+            scales: { x: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } }, y: { grid: { color: 'rgba(255,255,255,0.03)' }, ticks: { color: '#64748b', font: { size: 10 } } } },
+        };
+        function destroyChart(id) { if (charts[id]) { charts[id].destroy(); delete charts[id]; } }
+
+        // ===== SYNC DATA =====
+        async function startSyncData() {
+            const btn = document.getElementById('btnFetch');
+            btn.disabled = true; btn.textContent = 'Sinkronisasi...';
+            document.getElementById('fetchProgress').classList.remove('hidden');
+            try {
+                await fetch(`${API}/sync-data`, { method: 'POST' });
+                const es = new EventSource(`${API}/fetch-progress`);
+                es.onmessage = (e) => {
+                    const d = JSON.parse(e.data);
+                    document.getElementById('fetchPct').textContent = d.progress + '%';
+                    document.getElementById('fetchBar').style.width = d.progress + '%';
+                    document.getElementById('fetchMessage').textContent = d.message;
+                    if (!d.running) { es.close(); btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Sinkronisasi Dataset'; loadDatasetInfo(); }
+                };
+                es.onerror = () => { es.close(); btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>Sinkronisasi Dataset'; };
+            } catch (err) { console.error(err); btn.disabled = false; btn.textContent = 'Sinkronisasi Dataset'; }
+        }
+
+        // ===== DATASET INFO =====
+        async function loadDatasetInfo() {
+            try {
+                const res = await fetch(`${API}/dataset-info`);
+                const data = await res.json();
+                const el = document.getElementById('datasetInfo');
+                let html = '';
+
+                // Local dataset info
+                if (data.local_dataset && data.local_dataset.available) {
+                    const d = data.local_dataset;
+                    html += `<div class="glass rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 rounded-full bg-emerald-400"></span><span class="text-sm font-medium text-white">Dataset Lokal (data/kualitas_udara/)</span><span class="text-xs text-neutral-300 mono ml-auto">Location: ${d.location_id}</span></div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-neutral-300">
+                            <div><span class="text-neutral-500 block">Records</span>${d.total_records.toLocaleString()}</div>
+                            <div><span class="text-neutral-500 block">File CSV</span>${d.total_files}</div>
+                            <div><span class="text-neutral-500 block">Total Hari</span>${d.total_days}</div>
+                            <div><span class="text-neutral-500 block">Rentang</span>${d.date_range?.start_display || '--'} — ${d.date_range?.end_display || '--'}</div>
+                        </div>
+                    </div>`;
+                    document.getElementById('ov-dataset-records').textContent = d.total_records.toLocaleString();
+                    document.getElementById('ov-dataset-range').textContent = `${d.total_days} hari • ${d.total_files} file`;
+                    document.getElementById('ds-total-days').textContent = d.total_days;
+                    document.getElementById('ds-total-files').textContent = d.total_files;
+                    document.getElementById('ds-total-records').textContent = d.total_records.toLocaleString();
+                    setStatusDot('ov-status-data', true);
+                }
+
+                if (data.existing_processed) {
+                    const d = data.existing_processed;
+                    html += `<div class="glass rounded-lg p-4 mt-3">
+                        <div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 rounded-full bg-neutral-400"></span><span class="text-sm font-medium text-white">processed_data.csv (Training)</span></div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-neutral-300">
+                            <div><span class="text-neutral-500 block">Records</span>${d.records.toLocaleString()}</div>
+                            <div><span class="text-neutral-500 block">Features</span>${d.features}</div>
+                            <div><span class="text-neutral-500 block">Mulai</span>${new Date(d.date_start).toLocaleDateString('id-ID')}</div>
+                            <div><span class="text-neutral-500 block">Akhir</span>${new Date(d.date_end).toLocaleDateString('id-ID')}</div>
+                        </div>
+                    </div>`;
+                }
+
+                if (!html) html = '<p class="text-sm text-neutral-400">Belum ada dataset tersedia. Gunakan "Sinkronisasi Dataset" untuk mengambil data.</p>';
+                el.innerHTML = html;
+
+                // Fetch history table
+                if (data.datasets && data.datasets.length > 0) {
+                    let tableHtml = '<table class="w-full text-sm"><thead><tr class="border-b border-white/10"><th class="text-left py-2 px-3 text-xs text-neutral-400">Waktu</th><th class="text-right py-2 px-3 text-xs text-neutral-400">Records</th><th class="text-right py-2 px-3 text-xs text-neutral-400">Requests</th><th class="text-right py-2 px-3 text-xs text-neutral-400">Durasi</th><th class="text-center py-2 px-3 text-xs text-neutral-400">Tipe</th><th class="text-center py-2 px-3 text-xs text-neutral-400">Status</th></tr></thead><tbody>';
+                    data.datasets.forEach(d => {
+                        const statusColor = d.status === 'done' ? 'text-emerald-400' : d.status === 'synced' ? 'text-neutral-400' : d.status === 'error' ? 'text-red-400' : d.status === 'no_new_data' ? 'text-yellow-400' : 'text-neutral-400';
+                        tableHtml += `<tr class="border-b border-white/5"><td class="py-2 px-3 text-xs text-neutral-300">${d.created_at ? new Date(d.created_at).toLocaleString('id-ID') : '--'}</td><td class="py-2 px-3 text-xs text-right text-white">${d.total_records}</td><td class="py-2 px-3 text-xs text-right text-neutral-300">${d.total_requests}</td><td class="py-2 px-3 text-xs text-right text-neutral-300">${d.fetch_duration_seconds ? d.fetch_duration_seconds.toFixed(1) + 's' : '--'}</td><td class="py-2 px-3 text-xs text-center text-neutral-300">${d.sync_type || '--'}</td><td class="py-2 px-3 text-xs text-center ${statusColor} font-medium">${d.status}</td></tr>`;
+                    });
+                    tableHtml += '</tbody></table>';
+                    document.getElementById('fetchHistory').innerHTML = tableHtml;
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // ===== DATASET MONITORING =====
+        async function loadDatasetMonitoring() {
+            try {
+                const res = await fetch(`${API}/dataset-monitoring`);
+                const data = await res.json();
+
+                // Summary
+                const sum = data.dataset_summary || {};
+                document.getElementById('mon-location').textContent = sum.location_id || '5586536';
+                document.getElementById('mon-records').textContent = (sum.total_records || 0).toLocaleString();
+                document.getElementById('mon-days').textContent = sum.total_days || 0;
+                document.getElementById('mon-files').textContent = sum.total_files || 0;
+                document.getElementById('mon-range').textContent = sum.date_range?.start_display && sum.date_range?.end_display ? `${sum.date_range.start_display} — ${sum.date_range.end_display}` : 'Belum ada data';
+
+                // Sync status
+                const sync = data.sync_status || {};
+                document.getElementById('mon-sync-local').textContent = sync.last_local_display || 'Belum ada data';
+                document.getElementById('mon-sync-current').textContent = sync.current_time_display || '--';
+                document.getElementById('mon-sync-gap').textContent = sync.gap_display || '--';
+                document.getElementById('mon-sync-gap').className = `text-sm font-bold status-${sync.status_color || 'red'}`;
+                document.getElementById('mon-sync-status').textContent = sync.status_message || '--';
+                document.getElementById('mon-sync-status').className = `text-sm font-bold status-${sync.status_color || 'red'}`;
+
+                // Update overview sync
+                document.getElementById('ov-sync-message').textContent = sync.status_message || '--';
+                document.getElementById('ov-sync-detail').textContent = `Terakhir: ${sync.last_local_display || '--'}`;
+                document.getElementById('ov-sync-gap').textContent = sync.gap_display || '--';
+                const dot = document.getElementById('ov-sync-dot');
+                dot.className = `w-3 h-3 rounded-full status-dot-${sync.status_color || 'red'}`;
+
+                // File table
+                const files = data.file_status || [];
+                let fileHtml = '';
+                if (files.length === 0) {
+                    fileHtml = '<tr><td colspan="4" class="py-4 text-center text-neutral-400 text-xs">Belum ada file CSV</td></tr>';
+                } else {
+                    files.forEach(f => {
+                        fileHtml += `<tr class="border-b border-white/5 hover:bg-white/3">
+                            <td class="py-2 px-3 text-sm text-white mono">${f.filename}</td>
+                            <td class="py-2 px-3 text-sm text-right text-neutral-300">${(f.records || 0).toLocaleString()}</td>
+                            <td class="py-2 px-3 text-sm text-right text-neutral-400">${f.size_display || '--'}</td>
+                            <td class="py-2 px-3 text-xs text-neutral-400">${f.last_modified_display || '--'}</td>
+                        </tr>`;
+                    });
+                }
+                document.getElementById('monFileTable').innerHTML = fileHtml;
+            } catch (err) { console.error(err); }
+        }
+
+        // ===== DATA VALIDATION =====
+        async function loadDataValidation() {
+            const el = document.getElementById('monValidation');
+            el.innerHTML = '<p class="text-sm text-neutral-400">Memvalidasi dataset...</p>';
+            try {
+                const res = await fetch(`${API}/dataset-validation`);
+                const data = await res.json();
+
+                let html = '';
+                // Summary bar
+                const statusColor = data.status === 'ok' ? 'emerald' : data.status === 'warning' ? 'yellow' : 'red';
+                html += `<div class="flex items-center gap-3 p-4 rounded-lg glass mb-4">
+                    <div class="w-3 h-3 rounded-full bg-${statusColor}-400"></div>
+                    <p class="text-sm font-medium text-white">${data.message}</p>
+                </div>`;
+
+                // Summary cards
+                if (data.summary) {
+                    const s = data.summary;
+                    html += `<div class="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4">
+                        <div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400">Total Records</div><p class="text-lg font-bold text-white">${s.total_records?.toLocaleString() || 0}</p></div>
+                        <div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400">Duplikat</div><p class="text-lg font-bold ${s.duplicate_timestamps > 0 ? 'text-yellow-400' : 'text-emerald-400'}">${s.duplicate_timestamps || 0}</p></div>
+                        <div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400">Gap Data</div><p class="text-lg font-bold ${s.gap_count > 0 ? 'text-yellow-400' : 'text-emerald-400'}">${s.gap_count || 0}</p></div>
+                        <div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400">Missing Values</div><p class="text-lg font-bold ${s.missing_values_total > 0 ? 'text-yellow-400' : 'text-emerald-400'}">${s.missing_values_total || 0}</p></div>
+                        <div class="glass rounded-lg p-3 text-center"><div class="text-xs text-neutral-400">Empty Records</div><p class="text-lg font-bold ${s.empty_records > 0 ? 'text-red-400' : 'text-emerald-400'}">${s.empty_records || 0}</p></div>
+                    </div>`;
+                }
+
+                // Issues list
+                if (data.issues && data.issues.length > 0) {
+                    html += '<div class="space-y-2">';
+                    data.issues.forEach(issue => {
+                        const icon = issue.severity === 'warning' ? '⚠️' : 'ℹ️';
+                        const bgColor = issue.severity === 'warning' ? 'bg-yellow-500/10 border-yellow-500/20' : 'bg-neutral-500/10 border-neutral-500/20';
+                        html += `<div class="p-3 rounded-lg border ${bgColor}">
+                            <p class="text-sm font-medium text-white">${icon} ${issue.message}</p>
+                            ${issue.type === 'missing_values' && issue.details ? '<div class="mt-2 text-xs text-neutral-300">' + Object.entries(issue.details).map(([col, info]) => `<span class="inline-block mr-3">${col}: ${info.count} (${info.percentage}%)</span>`).join('') + '</div>' : ''}
+                        </div>`;
+                    });
+                    html += '</div>';
+                } else {
+                    html += '<p class="text-sm text-emerald-400">✅ Tidak ada masalah ditemukan.</p>';
+                }
+
+                el.innerHTML = html;
+            } catch (err) { console.error(err); el.innerHTML = '<p class="text-sm text-red-400">Error saat memvalidasi dataset.</p>'; }
+        }
+
+        // ===== DATA QUALITY =====
+        async function loadDataQuality() {
+            try {
+                const res = await fetch(`${API}/data-quality?source=local`);
+                if (!res.ok) { const r2 = await fetch(`${API}/data-quality?source=existing`); if (!r2.ok) return; var data = await r2.json(); } else { var data = await res.json(); }
+
+                if (data.summary) {
+                    document.getElementById('an-total').textContent = data.summary.total_records?.toLocaleString() || '--';
+                    document.getElementById('an-features').textContent = data.summary.total_columns || '--';
+                    document.getElementById('an-daterange').textContent = data.summary.date_range?.start ? `${new Date(data.summary.date_range.start).toLocaleDateString('id-ID')} — ${new Date(data.summary.date_range.end).toLocaleDateString('id-ID')}` : '--';
+                    document.getElementById('an-interval').textContent = data.summary.interval || '--';
+                }
+                if (data.missing_values) {
+                    let html = '';
+                    Object.entries(data.missing_values).forEach(([col, info]) => {
+                        const barWidth = Math.min(100, info.percentage);
+                        const barColor = info.percentage > 10 ? 'bg-red-500' : info.percentage > 5 ? 'bg-yellow-500' : 'bg-emerald-500';
+                        html += `<div class="flex items-center gap-3"><span class="text-xs text-neutral-300 w-32 shrink-0 mono">${col}</span><div class="flex-1 bg-neutral-800/50 rounded-full h-2"><div class="${barColor} h-2 rounded-full" style="width:${barWidth}%"></div></div><span class="text-xs text-neutral-400 w-24 text-right">${info.count} (${info.percentage}%)</span></div>`;
+                    });
+                    document.getElementById('missingValues').innerHTML = html || '<p class="text-sm text-neutral-400">Tidak ada missing values</p>';
+                }
+                document.getElementById('qr-dup').textContent = data.duplicate_count || 0;
+                const totalMissing = Object.values(data.missing_values || {}).reduce((s, v) => s + v.count, 0);
+                document.getElementById('qr-missing').textContent = totalMissing;
+                const totalOutliers = Object.values(data.outlier_info || {}).reduce((s, v) => s + v.count, 0);
+                document.getElementById('qr-outlier').textContent = totalOutliers;
+                document.getElementById('qr-gap').textContent = data.total_gaps || 0;
+
+                const dist = data.distribution_stats || {};
+                if (dist.pm25_histogram) { destroyChart('pm25Dist'); const labels = dist.pm25_histogram.bin_edges.slice(0,-1).map((v,i)=>`${v}-${dist.pm25_histogram.bin_edges[i+1]}`); charts['pm25Dist'] = new Chart(document.getElementById('chartPm25Dist'), { type:'bar', data:{labels, datasets:[{label:'Count',data:dist.pm25_histogram.counts,backgroundColor:'rgba(99,102,241,0.6)',borderColor:'#6366f1',borderWidth:1}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}},scales:{...chartDefaults.scales,x:{...chartDefaults.scales.x,ticks:{...chartDefaults.scales.x.ticks,maxTicksLimit:10}}}}}); }
+                if (dist.by_hour) { destroyChart('byHour'); charts['byHour'] = new Chart(document.getElementById('chartByHour'), { type:'bar', data:{labels:dist.by_hour.hours.map(h=>h+':00'), datasets:[{label:'Mean PM2.5',data:dist.by_hour.means,backgroundColor:'rgba(6,182,212,0.5)',borderColor:'#06b6d4',borderWidth:1}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}}); }
+                if (dist.by_day) { destroyChart('byDay'); charts['byDay'] = new Chart(document.getElementById('chartByDay'), { type:'bar', data:{labels:dist.by_day.days, datasets:[{label:'Mean PM2.5',data:dist.by_day.means,backgroundColor:'rgba(168,85,247,0.5)',borderColor:'#a855f7',borderWidth:1}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}}); }
+                if (dist.by_month) { destroyChart('byMonth'); charts['byMonth'] = new Chart(document.getElementById('chartByMonth'), { type:'bar', data:{labels:dist.by_month.months, datasets:[{label:'Mean PM2.5',data:dist.by_month.means,backgroundColor:'rgba(16,185,129,0.5)',borderColor:'#10b981',borderWidth:1}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}}); }
+            } catch (err) { console.error(err); }
+        }
+
+        // ===== PREPROCESSING =====
+        async function runPreprocessing() {
+            const btn = document.getElementById('btnPreprocess');
+            btn.disabled = true; btn.textContent = 'Processing...';
+            try {
+                const res = await fetch(`${API}/preprocess?source=local`, { method: 'POST' });
+                if (!res.ok) { const res2 = await fetch(`${API}/preprocess?source=existing`, { method: 'POST' }); if (res2.ok) { const data = await res2.json(); renderPrepLog(data.preprocessing_log); } }
+                else { const data = await res.json(); renderPrepLog(data.preprocessing_log); }
+            } catch (err) { console.error(err); }
+            btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Jalankan Preprocessing';
+        }
+        async function loadPreprocessingLog() { try { const res = await fetch(`${API}/preprocessing-log`); if (res.ok) { const data = await res.json(); renderPrepLog(data); } } catch (err) {} }
+        function renderPrepLog(log) {
+            if (!log) return;
+            const interpolated = (log.steps_log || []).find(s => s.step && s.step.includes('Interpolasi'))?.values_filled || 0;
+            let html = `<div class="grid grid-cols-4 gap-4 mb-4"><div class="glass rounded-lg p-3 text-center"><div class="text-[10px] text-neutral-400">Data Mentah Awal</div><p class="text-lg font-bold text-white">${log.raw_records}</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-[10px] text-neutral-400">Diinterpolasi</div><p class="text-lg font-bold text-neutral-400">${interpolated}</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-[10px] text-neutral-400">Data Final Bersih</div><p class="text-lg font-bold text-emerald-400">${log.clean_records}</p></div><div class="glass rounded-lg p-3 text-center"><div class="text-[10px] text-neutral-400">Data Dibuang</div><p class="text-lg font-bold text-red-400">${log.dropped_records}</p></div></div>`;
+            if (log.steps_log) { html += '<div class="space-y-2">'; (Array.isArray(log.steps_log)?log.steps_log:[]).forEach((step,i) => { html += `<div class="flex items-start gap-3 py-2 border-b border-white/5"><span class="w-6 h-6 rounded-full bg-neutral-500/20 flex items-center justify-center text-xs text-neutral-300 font-bold shrink-0">${i+1}</span><div><p class="text-sm text-white font-medium">${step.step||''}</p><p class="text-xs text-neutral-400 mt-0.5">${step.records_after?'Records: '+step.records_after:''}${step.dropped?' Dropped: '+step.dropped:''}${step.values_filled?' Filled: '+step.values_filled:''}</p></div></div>`; }); html += '</div>'; }
+            html += `<div class="mt-4 glass rounded-lg p-3"><div class="text-xs text-neutral-400 mb-1">Total Features</div><p class="text-lg font-bold text-neutral-400">${log.total_features}</p></div>`;
+            document.getElementById('prepLogContent').innerHTML = html;
+            setStatusDot('ov-status-preprocess', true);
+        }
+
+        // ===== TRAINING =====
+        async function startTraining() {
+            const btn = document.getElementById('btnTrain');
+            btn.disabled = true; btn.textContent = 'Training...';
+            document.getElementById('trainProgress').classList.remove('hidden');
+            
+            const nEstimators = document.getElementById('hp-estimators').value;
+            const maxDepth = document.getElementById('hp-max-depth').value;
+            const lr = document.getElementById('hp-lr').value;
+            // Send hyperparameters
+            const hp = {
+                n_estimators: parseInt(document.getElementById('hp-estimators').value) || 1000,
+                max_depth: parseInt(document.getElementById('hp-max-depth').value) || 6,
+                learning_rate: parseFloat(document.getElementById('hp-lr').value) || 0.05,
+                test_split_pct: parseFloat(document.getElementById('hp-test-split')?.value) || 20.0,
+            };
+            
+            try {
+                await fetch(`${API}/train?source=local`, { 
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(hp)
+                });
+                const es = new EventSource(`${API}/train-progress`);
+                es.onmessage = (e) => {
+                    const d = JSON.parse(e.data);
+                    document.getElementById('trainPct').textContent = d.progress + '%';
+                    document.getElementById('trainBar').style.width = d.progress + '%';
+                    document.getElementById('trainMessage').textContent = d.message;
+                    const steps = ['validation', 'loading', 'preprocessing', 'training', 'evaluating'];
+                    const currentStepIdx = steps.indexOf(d.step);
+                    steps.forEach((s, i) => { const el = document.getElementById(`step-${s}`); if (!el) return; const dot = el.querySelector('span'); if (i < currentStepIdx) { dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400'; el.className = el.className.replace('text-neutral-400','text-emerald-400'); } else if (i === currentStepIdx) { dot.className = 'w-1.5 h-1.5 rounded-full bg-neutral-400 animate-pulse'; el.className = el.className.replace('text-neutral-400','text-neutral-300'); } });
+                    if (!d.running) { es.close(); btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>Mulai Training'; loadTrainingInfo(); loadOverview(); setStatusDot('ov-status-train',true); setStatusDot('ov-status-eval',true); }
+                };
+                es.onerror = () => { es.close(); btn.disabled = false; btn.textContent = 'Mulai Training'; };
+            } catch (err) { console.error(err); btn.disabled = false; btn.textContent = 'Mulai Training'; }
+        }
+        async function loadTrainingInfo() { try { const res = await fetch(`${API}/metrics`); if (!res.ok) return; const data = await res.json(); if (data.experiment) { document.getElementById('tr-ntrain').textContent = data.experiment.n_train?.toLocaleString()||'--'; document.getElementById('tr-ntest').textContent = data.experiment.n_test?.toLocaleString()||'--'; document.getElementById('tr-duration').textContent = data.experiment.training_duration_seconds ? data.experiment.training_duration_seconds.toFixed(1)+'s':'--'; } } catch (err) {} }
+
+        // ===== EVALUATION =====
+        async function loadEvaluation() {
+            try {
+                const mRes = await fetch(`${API}/metrics`); if (mRes.ok) { const mData = await mRes.json(); const test = mData.test || {}; document.getElementById('ev-mae').textContent = test.mae != null ? test.mae.toFixed(4):'--'; document.getElementById('ev-rmse').textContent = test.rmse != null ? test.rmse.toFixed(4):'--'; document.getElementById('ev-r2').textContent = test.r2 != null ? test.r2.toFixed(4):'--'; document.getElementById('ev-mape').textContent = test.mape != null ? test.mape.toFixed(2)+'%':'--'; document.getElementById('ov-r2').textContent = test.r2 != null ? test.r2.toFixed(4):'--'; document.getElementById('ov-mae').textContent = test.mae != null ? test.mae.toFixed(4):'--'; if (mData.experiment) document.getElementById('ov-features').textContent = mData.experiment.n_features||'--'; }
+                const pRes = await fetch(`${API}/predictions`); if (pRes.ok) { const pData = await pRes.json(); if (pData.predictions && pData.predictions.length > 0) { destroyChart('actualPred'); const labels = pData.predictions.map(p=>p.datetime); const actuals = pData.predictions.map(p=>p.actual); const predicted = pData.predictions.map(p=>p.predicted); charts['actualPred'] = new Chart(document.getElementById('chartActualPred'), { type:'line', data:{labels, datasets:[{label:'Actual',data:actuals,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.3,borderWidth:1.5,pointRadius:0},{label:'Predicted',data:predicted,borderColor:'#f97316',backgroundColor:'rgba(249,115,22,0.05)',tension:0.3,borderWidth:1.5,pointRadius:0,borderDash:[4,4]}]}, options:{...chartDefaults,interaction:{mode:'index',intersect:false},scales:{x:{type:'time',time:{tooltipFormat:'dd MMM yyyy HH:mm',displayFormats:{hour:'HH:mm',day:'dd MMM'}},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#64748b',font:{size:10},maxTicksLimit:10}},y:{title:{display:true,text:'PM2.5 (µg/m³)',color:'#64748b'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#64748b',font:{size:10}}}}}}); }}
+                const rRes = await fetch(`${API}/residuals`); if (rRes.ok) { const rData = await rRes.json(); if (rData.residual_histogram && rData.residual_histogram.counts.length > 0) { destroyChart('errorDist'); const labels = rData.residual_histogram.bin_edges.slice(0,-1).map(v=>v.toFixed(2)); charts['errorDist'] = new Chart(document.getElementById('chartErrorDist'), { type:'bar', data:{labels, datasets:[{label:'Frequency',data:rData.residual_histogram.counts,backgroundColor:'rgba(99,102,241,0.6)',borderColor:'#6366f1',borderWidth:1}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}}); } if (rData.predictions && rData.predictions.length > 0) { destroyChart('residual'); const scatterData = rData.predictions.filter(p=>p.predicted!=null&&p.residual!=null).map(p=>({x:p.predicted,y:p.residual})); charts['residual'] = new Chart(document.getElementById('chartResidual'), { type:'scatter', data:{datasets:[{label:'Residual',data:scatterData,backgroundColor:'rgba(16,185,129,0.4)',borderColor:'#10b981',pointRadius:2}]}, options:{...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}},scales:{x:{title:{display:true,text:'Predicted',color:'#64748b'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#64748b'}},y:{title:{display:true,text:'Residual',color:'#64748b'},grid:{color:'rgba(255,255,255,0.03)'},ticks:{color:'#64748b'}}}}}); }}
+            } catch (err) { console.error(err); }
+        }
+
+        // ===== FEATURE IMPORTANCE =====
+        async function loadFeatureImportance() {
+            try { const res = await fetch(`${API}/feature-importance`); if (!res.ok) return; const data = await res.json(); const features = data.features || []; if (features.length === 0) return; const sorted = [...features].sort((a,b)=>(b.importance||0)-(a.importance||0)); const top = sorted.slice(0,25); const maxImp = top[0]?.importance||1; destroyChart('featureImp'); charts['featureImp'] = new Chart(document.getElementById('chartFeatureImp'), { type:'bar', data:{labels:top.map(f=>f.feature_name||f.feature), datasets:[{label:'Importance',data:top.map(f=>f.importance),backgroundColor:top.map((_,i)=>`hsla(${240+i*5},70%,${55+i}%,0.7)`),borderColor:top.map((_,i)=>`hsla(${240+i*5},70%,60%,1)`),borderWidth:1}]}, options:{indexAxis:'y',...chartDefaults,plugins:{...chartDefaults.plugins,legend:{display:false}}}}); let html = ''; sorted.forEach((f,i) => { const pct = ((f.importance||0)/maxImp*100).toFixed(0); html += `<tr class="border-b border-white/5 hover:bg-white/3"><td class="py-2 px-3 text-xs text-neutral-400">#${i+1}</td><td class="py-2 px-3 text-sm text-white mono">${f.feature_name||f.feature}</td><td class="py-2 px-3 text-sm text-right text-neutral-300 mono">${(f.importance||0).toFixed(4)}</td><td class="py-2 px-3"><div class="bg-neutral-800/50 rounded-full h-2"><div class="bg-gradient-to-r from-neutral-500 to-neutral-500 h-2 rounded-full" style="width:${pct}%"></div></div></td></tr>`; }); document.getElementById('featureTableBody').innerHTML = html; } catch (err) { console.error(err); }
+        }
+
+        // ===== HORIZON ANALYSIS =====
+        // ===== EXPERIMENT HISTORY =====
+        async function loadExperiments() {
+            try {
+                const res = await fetch(`${API}/experiment-history`);
+                if (!res.ok) return;
+                const data = await res.json();
+                const experiments = data.experiments || [];
+
+                if (experiments.length === 0) {
+                    document.getElementById('experimentsTableBody').innerHTML = '<tr><td colspan="12" class="py-6 text-center text-neutral-400 text-xs">Belum ada eksperimen</td></tr>';
+                    return;
+                }
+
+                let html = '';
+                const maeValues = [];
+                const expLabels = [];
+
+                experiments.forEach(exp => {
+                    const statusColor = exp.status === 'done' ? 'text-emerald-400 bg-emerald-500/10' : exp.status === 'error' ? 'text-red-400 bg-red-500/10' : 'text-yellow-400 bg-yellow-500/10';
+                    const testMae = exp.test_metrics?.mae;
+                    const testRmse = exp.test_metrics?.rmse;
+                    const testR2 = exp.test_metrics?.r2;
+                    const testMape = exp.test_metrics?.mape;
+                    const totalData = exp.total_data_records || (exp.n_train + exp.n_test) || '--';
+                    const rangeStart = exp.data_range_start ? new Date(exp.data_range_start).toLocaleDateString('id-ID', {day:'2-digit',month:'short'}) : '--';
+                    const rangeEnd = exp.data_range_end ? new Date(exp.data_range_end).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'2-digit'}) : '--';
+
+                    if (testMae != null) { maeValues.push(testMae); expLabels.push('#' + exp.id); }
+
+                    html += `<tr class="border-b border-white/5 hover:bg-white/3">
+                        <td class="py-2 px-3 text-xs text-neutral-400 mono">#${exp.id}</td>
+                        <td class="py-2 px-3 text-xs text-neutral-300">${exp.created_at ? new Date(exp.created_at).toLocaleString('id-ID') : '--'}</td>
+                        <td class="py-2 px-3 text-xs text-white">${exp.model_type}</td>
+                        <td class="py-2 px-3 text-xs text-right text-neutral-300">${typeof totalData === 'number' ? totalData.toLocaleString() : totalData}</td>
+                        <td class="py-2 px-3 text-xs text-neutral-300">${rangeStart} — ${rangeEnd}</td>
+                        
+                        <td class="py-2 px-3 text-xs text-right text-neutral-400 mono">${testMae != null ? testMae.toFixed(4) : '--'}</td>
+                        <td class="py-2 px-3 text-xs text-right text-orange-400 mono">${testRmse != null ? testRmse.toFixed(4) : '--'}</td>
+                        <td class="py-2 px-3 text-xs text-right text-emerald-400 mono">${testR2 != null ? testR2.toFixed(4) : '--'}</td>
+                        <td class="py-2 px-3 text-xs text-right text-neutral-400 mono">${testMape != null ? testMape.toFixed(2) + '%' : '--'}</td>
+                        <td class="py-2 px-3 text-center"><span class="px-2 py-0.5 rounded text-[10px] font-medium ${statusColor}">${exp.status}</span></td>
+                        <td class="py-2 px-3 text-xs text-right text-neutral-300">${exp.training_duration_seconds ? exp.training_duration_seconds.toFixed(1) + 's' : '--'}</td>
+                    </tr>`;
+                });
+                document.getElementById('experimentsTableBody').innerHTML = html;
+
+                // Comparison chart
+                if (maeValues.length > 1) {
+                    destroyChart('expComparison');
+                    charts['expComparison'] = new Chart(document.getElementById('chartExpComparison'), {
+                        type: 'bar',
+                        data: {
+                            labels: expLabels.reverse(),
+                            datasets: [{ label: 'MAE (µg/m³)', data: maeValues.reverse(), backgroundColor: 'rgba(99,102,241,0.6)', borderColor: '#6366f1', borderWidth: 1 }],
+                        },
+                        options: { ...chartDefaults, plugins: { ...chartDefaults.plugins, legend: { display: false } } },
+                    });
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        // ===== HELPER: Status dots =====
+        function setStatusDot(id, done) { const el = document.getElementById(id); if (el && done) { el.className = 'w-10 h-10 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center mb-2'; el.querySelector('svg').classList.remove('text-neutral-400'); el.querySelector('svg').classList.add('text-emerald-400'); } }
+
+        // ===== OVERVIEW LOAD =====
+        async function loadOverview() {
+            await loadDatasetInfo();
+            try { const res = await fetch(`${API}/metrics`); if (res.ok) { const data = await res.json(); const test = data.test || {}; document.getElementById('ov-r2').textContent = test.r2 != null ? test.r2.toFixed(4):'--'; document.getElementById('ov-mae').textContent = test.mae != null ? test.mae.toFixed(4):'--'; if (data.experiment) { document.getElementById('ov-features').textContent = data.experiment.n_features||'--'; if (data.experiment.status === 'done') { setStatusDot('ov-status-train',true); setStatusDot('ov-status-eval',true); } } } } catch (err) {}
+            // Load sync status for overview
+            try { const res = await fetch(`${API}/dataset-monitoring`); if (res.ok) { const data = await res.json(); const sync = data.sync_status || {}; document.getElementById('ov-sync-message').textContent = sync.status_message || '--'; document.getElementById('ov-sync-detail').textContent = `Terakhir: ${sync.last_local_display || '--'}`; document.getElementById('ov-sync-gap').textContent = sync.gap_display || '--'; const dot = document.getElementById('ov-sync-dot'); dot.className = `w-3 h-3 rounded-full status-dot-${sync.status_color || 'red'}`; } } catch (err) {}
+        }
+
+        // ===== INIT =====
+        async function loadLivePrediction() {
+            const msg = document.getElementById('livePredictionMsg');
+            msg.textContent = "Memuat prediksi...";
+            try {
+                // Menggunakan API prediksi utama untuk mendapatkan hasil real-time
+                const res = await fetch('/api/predictions');
+                if (!res.ok) throw new Error('Gagal memuat API');
+                const data = await res.json();
+                
+                if (data.status === 'insufficient_data') {
+                    msg.textContent = data.message;
+                    return;
+                }
+                
+                if (!data.predictions || data.predictions.length === 0) {
+                    msg.textContent = "Data prediksi kosong.";
+                    return;
+                }
+
+                const labels = data.predictions.map(p => {
+                    const dt = new Date(p.target_time);
+                    return dt.toLocaleDateString('id-ID', {day: 'numeric', month: 'short'}) + ' ' + dt.toLocaleTimeString('id-ID', {hour: '2-digit', minute:'2-digit'});
+                });
+                const pm25 = data.predictions.map(p => p.pm25_predicted);
+
+                msg.textContent = "Berhasil memuat " + pm25.length + " jam prediksi ke depan.";
+
+                destroyChart('livePred');
+                charts['livePred'] = new Chart(document.getElementById('chartLivePrediction'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'PM2.5 (µg/m³)',
+                            data: pm25,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            fill: true,
+                            tension: 0.4,
+                            borderWidth: 2,
+                            pointRadius: 3
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        scales: {
+                            x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } } },
+                            y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8', font: { family: 'Inter', size: 10 } }, beginAtZero: true }
+                        },
+                        plugins: { legend: { display: false } }
+                    }
+                });
+
+            } catch (err) {
+                console.error(err);
+                msg.textContent = "Gagal memuat: " + err.message;
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => { 
+            loadOverview(); 
+            loadLivePrediction();
+        });
+    </script>
+</body>
+</html>

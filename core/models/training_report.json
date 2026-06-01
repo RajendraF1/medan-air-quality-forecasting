@@ -1,0 +1,54 @@
+{
+  "model_type": "XGBRegressor",
+  "model_version": "20260602_021124",
+  "hyperparameters": {
+    "n_estimators": 1000,
+    "learning_rate": 0.05,
+    "max_depth": 6,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "min_child_weight": 3,
+    "gamma": 0.1,
+    "random_state": 42
+  },
+  "cv_scores": {
+    "mae_mean": 1.6315899719090652,
+    "rmse_mean": 3.1292417833422994,
+    "r2_mean": 0.9551101341248927
+  },
+  "final_metrics": {
+    "train": {
+      "mae": 0.19097880315224539,
+      "rmse": 0.34751068698835147,
+      "r2": 0.9999054815970541,
+      "mape": 0.825795368746362,
+      "max_error": 10.039387226104736,
+      "median_ae": 0.13652404149373432
+    },
+    "test": {
+      "mae": 0.31595034291554513,
+      "rmse": 0.6881255944177841,
+      "r2": 0.9927476576991432,
+      "mape": 4.4203010169586765,
+      "max_error": 8.254251861572264,
+      "median_ae": 0.19236011505126882
+    }
+  },
+  "top_10_features": [
+    "pm1",
+    "pm1_lag_1h",
+    "pm25_lag_24h",
+    "pm25_lag_1h",
+    "pm25_rolling_mean_3h",
+    "pm25_diff_3h",
+    "um003",
+    "dow_sin",
+    "humidity_diff_1h",
+    "relativehumidity"
+  ],
+  "n_features": 40,
+  "n_train": 2121,
+  "n_test": 909,
+  "training_duration_seconds": 1.86,
+  "trained_at": "2026-06-02T02:11:24.890562+07:00"
+}

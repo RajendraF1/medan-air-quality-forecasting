@@ -1,0 +1,25 @@
+# Core Data Science
+pandas>=2.0.0
+numpy>=1.24.0
+scikit-learn>=1.3.0
+xgboost>=2.0.0
+joblib>=1.3.0
+
+# Web Framework (Production)
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Database (Production)
+sqlalchemy>=2.0.0
+# pymysql>=1.1.0  # Uncomment for MySQL
+# aiomysql>=0.2.0 # Uncomment for MySQL async
+
+# HTTP Client & Env
+httpx>=0.27.0
+python-dotenv>=1.0.0
+
+# Asynchronous operations
+aiofiles>=23.2.0
+
+# Note: matplotlib is no longer needed in production
