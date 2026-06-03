@@ -43,8 +43,8 @@
   ],
   "target": "pm25",
   "n_features": 40,
-  "n_train": 2121,
-  "n_test": 909,
+  "n_train": 2424,
+  "n_test": 606,
   "parameters_used": [
     "pm1",
     "pm25",

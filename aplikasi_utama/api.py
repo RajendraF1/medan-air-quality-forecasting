@@ -54,6 +54,10 @@ async def get_current(db: Session = Depends(get_db)):
 
     # Cari dalam 14 hari terakhir
     df = load_local_dataset(days=14)
+    if df is None or len(df) == 0:
+        df = load_local_dataset(days=30)
+    if df is None or len(df) == 0:
+        df = load_local_dataset()
 
     if df is not None and len(df) > 0:
         last_row = df.iloc[-1]
@@ -105,7 +109,9 @@ async def get_history(
     if len(df) == 0:
         # Fallback: ambil N record terakhir
         df_full = load_local_dataset(days=30)
-        if df_full is not None:
+        if df_full is None or len(df_full) == 0:
+            df_full = load_local_dataset()
+        if df_full is not None and len(df_full) > 0:
             df = df_full.tail(hours).copy()
 
     records = []
@@ -250,6 +256,10 @@ async def get_health_recs():
 
     # Cek dalam 14 hari terakhir
     df = load_local_dataset(days=14)
+    if df is None or len(df) == 0:
+        df = load_local_dataset(days=30)
+    if df is None or len(df) == 0:
+        df = load_local_dataset()
 
     if df is None or len(df) == 0:
         return {
